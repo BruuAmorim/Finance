@@ -35,8 +35,9 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById('faturaDataVencimento').valueAsDate = proximoMes;
     initCharts();
     
-    // Gerar transações automáticas de despesas recorrentes
+    // Gerar transações automáticas de despesas recorrentes e despesas cartões
     gerarTransacoesRecorrentes();
+    gerarTransacoesFaturasParceladas();
     
     updateUI(currentMonth, currentYear);
     atualizarTabelaFaturas();
@@ -214,6 +215,9 @@ function updateUI(filterMonth = null, filterYear = null) {
         saldoMesEl.innerText = saldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     }
 
+    // Atualizar totais de despesas recorrentes e despesas cartões
+    atualizarTotaisRecorrentes(filterMonth, filterYear);
+
     // Atualizar gráfico de pizza
     pieChart.data.labels = Object.keys(categories);
     pieChart.data.datasets[0].data = Object.values(categories);
@@ -308,17 +312,254 @@ function clearForm() {
 // ===============================
 //  CSV
 // ===============================
+// ===============================
+//  EXPORTAR EXCEL - VERSÃO MELHORADA
+// ===============================
+function exportExcel() {
+    try {
+        // Criar workbook
+        const wb = XLSX.utils.book_new();
+
+        // Organizar transações por mês e ano
+        const transacoesPorMes = {};
+        
+        transactions.forEach(t => {
+            try {
+                const data = new Date(t.date + 'T00:00:00');
+                if (isNaN(data.getTime())) {
+                    // Tentar formato alternativo
+                    const partes = t.date.split('-');
+                    if (partes.length === 3) {
+                        const dataAlt = new Date(partes[0], partes[1] - 1, partes[2]);
+                        if (!isNaN(dataAlt.getTime())) {
+                            const mes = dataAlt.getMonth() + 1;
+                            const ano = dataAlt.getFullYear();
+                            const chave = `${ano}-${String(mes).padStart(2, '0')}`;
+                            
+                            if (!transacoesPorMes[chave]) {
+                                transacoesPorMes[chave] = [];
+                            }
+                            
+                            transacoesPorMes[chave].push({
+                                ...t,
+                                mesNumero: mes,
+                                ano: ano,
+                                dataObj: dataAlt
+                            });
+                        }
+                    }
+                } else {
+                    const mes = data.getMonth() + 1;
+                    const ano = data.getFullYear();
+                    const chave = `${ano}-${String(mes).padStart(2, '0')}`;
+                    
+                    if (!transacoesPorMes[chave]) {
+                        transacoesPorMes[chave] = [];
+                    }
+                    
+                    transacoesPorMes[chave].push({
+                        ...t,
+                        mesNumero: mes,
+                        ano: ano,
+                        dataObj: data
+                    });
+                }
+            } catch (e) {
+                console.warn('Erro ao processar transação:', t, e);
+            }
+        });
+
+        // Ordenar chaves (meses/anos)
+        const chavesOrdenadas = Object.keys(transacoesPorMes).sort();
+        const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+        // Processar cada mês
+        chavesOrdenadas.forEach(chave => {
+            const transacoesMes = transacoesPorMes[chave];
+            if (!transacoesMes || transacoesMes.length === 0) return;
+            
+            const mesNome = meses[transacoesMes[0].mesNumero - 1];
+            const ano = transacoesMes[0].ano;
+            const nomeAba = `${mesNome}_${ano}`.substring(0, 31); // Limite de caracteres do Excel
+
+            // Preparar dados para a planilha
+            const dadosPlanilha = [];
+
+            // Cabeçalho com estilo profissional
+            dadosPlanilha.push([
+                'Identificação',
+                'Data',
+                'Mês',
+                'Ano',
+                'Categoria',
+                'Tipo',
+                'Valor (R$)',
+                'Observação'
+            ]);
+
+            // Adicionar linhas de dados
+            let receitasMes = 0;
+            let despesasMes = 0;
+
+            transacoesMes.forEach((t, idx) => {
+                const dataObj = t.dataObj || new Date(t.date);
+                const dia = String(dataObj.getDate()).padStart(2, '0');
+                const mesFormatado = String(dataObj.getMonth() + 1).padStart(2, '0');
+                const anoFormatado = dataObj.getFullYear();
+                const dataFormatada = `${dia}/${mesFormatado}/${anoFormatado}`;
+
+                if (t.type === 'Receita') {
+                    receitasMes += t.amount;
+                } else {
+                    despesasMes += t.amount;
+                }
+
+                // Criar identificação única
+                const identificacao = `${t.type.substring(0, 3).toUpperCase()}_${t.category.toUpperCase().replace(/\s+/g, '_')}_${String(idx + 1).padStart(3, '0')}`;
+
+                dadosPlanilha.push([
+                    identificacao,
+                    dataFormatada,
+                    mesNome,
+                    ano,
+                    t.category,
+                    t.type,
+                    t.amount,
+                    t.obs || ''
+                ]);
+            });
+
+            // Adicionar linha de totais
+            dadosPlanilha.push([]); // Linha vazia
+            dadosPlanilha.push(['', '', '', '', '', 'TOTAL RECEITAS', receitasMes, '']);
+            dadosPlanilha.push(['', '', '', '', '', 'TOTAL DESPESAS', despesasMes, '']);
+            dadosPlanilha.push(['', '', '', '', '', 'SALDO DO MÊS', receitasMes - despesasMes, '']);
+
+            // Criar worksheet
+            const ws = XLSX.utils.aoa_to_sheet(dadosPlanilha);
+
+            // Definir larguras das colunas
+            ws['!cols'] = [
+                { wch: 30 }, // Identificação
+                { wch: 12 }, // Data
+                { wch: 12 }, // Mês
+                { wch: 8 },  // Ano
+                { wch: 25 }, // Categoria
+                { wch: 15 }, // Tipo
+                { wch: 18 }, // Valor
+                { wch: 40 }  // Observação
+            ];
+
+            // Formatar valores monetários
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            for (let row = 1; row <= range.e.r; row++) {
+                const cellValor = XLSX.utils.encode_cell({ r: row, c: 6 }); // Coluna Valor (G)
+                if (ws[cellValor] && typeof ws[cellValor].v === 'number') {
+                    ws[cellValor].z = '"R$"#,##0.00';
+                }
+            }
+
+            // Adicionar filtro automático
+            if (dadosPlanilha.length > 1) {
+                ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: transacoesMes.length, c: 7 } }) };
+            }
+
+            // Adicionar worksheet ao workbook
+            XLSX.utils.book_append_sheet(wb, ws, nomeAba);
+        });
+
+        // Criar planilha de resumo geral
+        const dadosResumo = [];
+        dadosResumo.push(['RESUMO FINANCEIRO - EVACLOUDD FINANCE']);
+        dadosResumo.push([]);
+        dadosResumo.push(['Período', 'Receitas (R$)', 'Despesas (R$)', 'Saldo (R$)', 'Percentual Despesas/Receitas']);
+
+        let totalReceitas = 0;
+        let totalDespesas = 0;
+
+        chavesOrdenadas.forEach(chave => {
+            const transacoesMes = transacoesPorMes[chave];
+            if (!transacoesMes || transacoesMes.length === 0) return;
+            
+            const mesNome = meses[transacoesMes[0].mesNumero - 1];
+            const ano = transacoesMes[0].ano;
+            
+            let receitasMes = 0;
+            let despesasMes = 0;
+
+            transacoesMes.forEach(t => {
+                if (t.type === 'Receita') {
+                    receitasMes += t.amount;
+                    totalReceitas += t.amount;
+                } else {
+                    despesasMes += t.amount;
+                    totalDespesas += t.amount;
+                }
+            });
+
+            const saldo = receitasMes - despesasMes;
+            const percentual = receitasMes > 0 ? (despesasMes / receitasMes) * 100 : 0;
+
+            dadosResumo.push([
+                `${mesNome}/${ano}`,
+                receitasMes,
+                despesasMes,
+                saldo,
+                percentual
+            ]);
+        });
+
+        dadosResumo.push([]);
+        dadosResumo.push(['TOTAL GERAL', totalReceitas, totalDespesas, totalReceitas - totalDespesas, 
+                         totalReceitas > 0 ? (totalDespesas / totalReceitas) * 100 : 0]);
+
+        const wsResumo = XLSX.utils.aoa_to_sheet(dadosResumo);
+        wsResumo['!cols'] = [
+            { wch: 20 },
+            { wch: 18 },
+            { wch: 18 },
+            { wch: 18 },
+            { wch: 30 }
+        ];
+
+        // Formatar valores monetários no resumo
+        const rangeResumo = XLSX.utils.decode_range(wsResumo['!ref']);
+        for (let row = 3; row <= rangeResumo.e.r; row++) {
+            for (let col = 1; col <= 3; col++) {
+                const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+                if (wsResumo[cellAddress] && typeof wsResumo[cellAddress].v === 'number') {
+                    wsResumo[cellAddress].z = '"R$"#,##0.00';
+                }
+            }
+            // Coluna de percentual
+            const cellPercent = XLSX.utils.encode_cell({ r: row, c: 4 });
+            if (wsResumo[cellPercent] && typeof wsResumo[cellPercent].v === 'number') {
+                wsResumo[cellPercent].z = '0.00"%"';
+            }
+        }
+
+        XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo_Geral");
+
+        // Gerar nome do arquivo com data
+        const hoje = new Date();
+        const dataStr = `${String(hoje.getDate()).padStart(2, '0')}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${hoje.getFullYear()}`;
+        const nomeArquivo = `Relatorio_Financeiro_EvaCloudd_${dataStr}.xlsx`;
+
+        // Salvar arquivo
+        XLSX.writeFile(wb, nomeArquivo);
+
+        // Feedback visual
+        alert(`✅ Arquivo Excel exportado com sucesso!\n\nArquivo: ${nomeArquivo}\n\nO arquivo contém:\n- Planilhas separadas por mês\n- Filtros automáticos nas colunas\n- Formatação de moeda (R$)\n- Resumo geral consolidado`);
+    } catch (error) {
+        console.error('Erro ao exportar Excel:', error);
+        alert('❌ Erro ao exportar arquivo Excel. Verifique o console para mais detalhes.');
+    }
+}
+
+// Função mantida para compatibilidade
 function exportCSV() {
-    let csv = "Data,Categoria,Tipo,Valor,Obs\n";
-
-    transactions.forEach(t => {
-        csv += `${t.date},${t.category},${t.type},${t.amount},${t.obs}\n`;
-    });
-
-    const link = document.createElement("a");
-    link.href = "data:text/csv;charset=utf-8," + encodeURI(csv);
-    link.download = "relatorio_evacloud.csv";
-    link.click();
+    exportExcel(); // Redireciona para Excel
 }
 
 // ===============================
@@ -524,7 +765,7 @@ function atualizarGraficoLinha(transacoes, mes, ano) {
 }
 
 // ===============================
-//  FATURAS PARCELADAS
+//  DESPESAS CARTÕES
 // ===============================
 
 function salvarFaturasLocal() {
@@ -646,8 +887,13 @@ function adicionarFaturaParcelada(e) {
 
     faturasParceladas.push(novaFatura);
     salvarFaturasLocal();
+    
+    // Gerar transações automáticas para as parcelas não pagas
+    gerarTransacoesFaturasParceladas();
+    
     atualizarTabelaFaturas();
     atualizarFiltros();
+    updateUI(currentMonth, currentYear);
     document.getElementById('faturaForm').reset();
     const hoje = new Date();
     document.getElementById('faturaDataInicio').valueAsDate = hoje;
@@ -657,7 +903,7 @@ function adicionarFaturaParcelada(e) {
     document.getElementById('faturaParcelasPagas').value = 0;
     toggleFaturaForm();
 
-    alert("Fatura parcelada adicionada com sucesso!");
+    alert("Despesa cartão adicionada com sucesso!");
 }
 
 function calcularJurosAtraso(fatura, diasAtraso = 0) {
@@ -713,7 +959,7 @@ function atualizarTabelaFaturas() {
         tbody.innerHTML = `
             <tr>
                 <td colspan="11" style="text-align: center; padding: 40px; color: var(--text-light);">
-                    Nenhuma fatura parcelada cadastrada.
+                    Nenhuma despesa cartão cadastrada.
                 </td>
             </tr>
         `;
@@ -849,9 +1095,22 @@ function marcarParcelaPaga(faturaId) {
     proximaParcela.paga = true;
     calcularParcelasRestantes(fatura);
 
+    // Remover transação da parcela paga e regenerar próximas
+    const hoje = new Date();
+    transactions = transactions.filter(t => {
+        if (t.faturaId === faturaId && t.parcelaNumero === proximaParcela.numero) {
+            return false;
+        }
+        return true;
+    });
+    
+    gerarTransacoesFaturasParceladas();
+
     salvarFaturasLocal();
+    salvarLocal();
     atualizarTabelaFaturas();
     atualizarFiltros();
+    updateUI(currentMonth, currentYear);
 }
 
 function abrirModalParcelas(faturaId) {
@@ -943,14 +1202,27 @@ function marcarParcelaEspecifica(faturaId, numeroParcela) {
     parcela.paga = true;
     calcularParcelasRestantes(fatura);
 
+    // Remover transação da parcela paga e regenerar próximas
+    const hoje = new Date();
+    transactions = transactions.filter(t => {
+        if (t.faturaId === faturaId && t.parcelaNumero === numeroParcela) {
+            return false;
+        }
+        return true;
+    });
+    
+    gerarTransacoesFaturasParceladas();
+
     salvarFaturasLocal();
+    salvarLocal();
     fecharModalParcelas();
     atualizarTabelaFaturas();
     atualizarFiltros();
+    updateUI(currentMonth, currentYear);
 }
 
 function removerFatura(faturaId) {
-    if (!confirm("Deseja remover esta fatura parcelada?")) return;
+    if (!confirm("Deseja remover esta despesa cartão?")) return;
 
     faturasParceladas = faturasParceladas.filter(f => f.id !== faturaId);
     salvarFaturasLocal();
@@ -1075,6 +1347,174 @@ function gerarTransacoesRecorrentes() {
                 
                 transactions.push(novaTransacao);
             }
+        });
+    }
+    
+    salvarLocal();
+}
+
+// ===============================
+//  ATUALIZAR TOTAIS RECORRENTES NO HEADER
+// ===============================
+function atualizarTotaisRecorrentes(filterMonth = null, filterYear = null) {
+    const hoje = new Date();
+    const mesAtual = filterMonth !== null ? filterMonth : hoje.getMonth();
+    const anoAtual = filterYear !== null ? filterYear : hoje.getFullYear();
+
+    // Calcular total de despesas recorrentes para o mês
+    let totalDespesasRecorrentes = 0;
+    despesasRecorrentes.forEach(despesa => {
+        if (!despesa.ativa) return;
+
+        const dataInicio = new Date(despesa.inicio);
+        const dataTermino = despesa.termino ? new Date(despesa.termino) : null;
+
+        // Verificar se a despesa se aplica ao mês atual
+        if (anoAtual < dataInicio.getFullYear() || 
+            (anoAtual === dataInicio.getFullYear() && mesAtual < dataInicio.getMonth())) {
+            return;
+        }
+
+        if (dataTermino) {
+            if (anoAtual > dataTermino.getFullYear() || 
+                (anoAtual === dataTermino.getFullYear() && mesAtual > dataTermino.getMonth())) {
+                return;
+            }
+        }
+
+        totalDespesasRecorrentes += despesa.valor;
+    });
+
+    // Calcular total de despesas cartões (parcelas pendentes) para o mês
+    let totalFaturasRecorrentes = 0;
+    faturasParceladas.forEach(fatura => {
+        fatura.parcelasDetalhes.forEach(parcela => {
+            if (parcela.paga) return;
+
+            const dataParcela = new Date(parcela.data);
+            if (dataParcela.getMonth() === mesAtual && dataParcela.getFullYear() === anoAtual) {
+                totalFaturasRecorrentes += parcela.valor;
+            }
+        });
+    });
+
+    // Atualizar elementos no header
+    const totalDespesasRecorrentesEl = document.getElementById('totalDespesasRecorrentes');
+    const totalFaturasRecorrentesEl = document.getElementById('totalFaturasRecorrentes');
+
+    if (totalDespesasRecorrentesEl) {
+        totalDespesasRecorrentesEl.innerText = totalDespesasRecorrentes.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+
+    if (totalFaturasRecorrentesEl) {
+        totalFaturasRecorrentesEl.innerText = totalFaturasRecorrentes.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+}
+
+// ===============================
+//  GERAR TRANSAÇÕES DE DESPESAS CARTÕES
+// ===============================
+function gerarTransacoesFaturasParceladas() {
+    const hoje = new Date();
+    const mesAtual = hoje.getMonth();
+    const anoAtual = hoje.getFullYear();
+    
+    // Gerar transações para os próximos 12 meses
+    for (let mesesAdicionar = 0; mesesAdicionar < 12; mesesAdicionar++) {
+        const dataAlvo = new Date(anoAtual, mesAtual + mesesAdicionar, 1);
+        const anoAlvo = dataAlvo.getFullYear();
+        const mesAlvo = dataAlvo.getMonth();
+        
+        faturasParceladas.forEach(fatura => {
+            // Processar apenas parcelas não pagas
+            fatura.parcelasDetalhes.forEach(parcela => {
+                if (parcela.paga) return;
+                
+                const dataParcela = new Date(parcela.data);
+                const anoParcela = dataParcela.getFullYear();
+                const mesParcela = dataParcela.getMonth();
+                
+                // Verificar se a parcela está no mês alvo
+                if (anoParcela !== anoAlvo || mesParcela !== mesAlvo) {
+                    return;
+                }
+                
+                // Verificar se já existe uma transação para esta parcela
+                const transacaoExistente = transactions.find(t => 
+                    t.faturaId === fatura.id && 
+                    t.parcelaNumero === parcela.numero
+                );
+                
+                if (!transacaoExistente) {
+                    const novaTransacao = {
+                        id: Date.now() + Math.random(),
+                        date: parcela.data,
+                        type: "Despesa",
+                        category: `Fatura ${fatura.cartao} - ${fatura.banco}`,
+                        amount: parcela.valor,
+                        obs: `[Despesa Cartão] ${fatura.descricao || `${fatura.cartao} / ${fatura.banco}`} - Parcela ${parcela.numero}/${fatura.parcelas}`,
+                        faturaId: fatura.id,
+                        parcelaNumero: parcela.numero
+                    };
+                    
+                    transactions.push(novaTransacao);
+                }
+            });
+        });
+    }
+    
+    salvarLocal();
+}
+
+// ===============================
+//  GERAR TRANSAÇÕES DE DESPESAS CARTÕES
+// ===============================
+function gerarTransacoesFaturasParceladas() {
+    const hoje = new Date();
+    const mesAtual = hoje.getMonth();
+    const anoAtual = hoje.getFullYear();
+    
+    // Gerar transações para os próximos 12 meses
+    for (let mesesAdicionar = 0; mesesAdicionar < 12; mesesAdicionar++) {
+        const dataAlvo = new Date(anoAtual, mesAtual + mesesAdicionar, 1);
+        const anoAlvo = dataAlvo.getFullYear();
+        const mesAlvo = dataAlvo.getMonth();
+        
+        faturasParceladas.forEach(fatura => {
+            // Processar apenas parcelas não pagas
+            fatura.parcelasDetalhes.forEach(parcela => {
+                if (parcela.paga) return;
+                
+                const dataParcela = new Date(parcela.data);
+                const anoParcela = dataParcela.getFullYear();
+                const mesParcela = dataParcela.getMonth();
+                
+                // Verificar se a parcela está no mês alvo
+                if (anoParcela !== anoAlvo || mesParcela !== mesAlvo) {
+                    return;
+                }
+                
+                // Verificar se já existe uma transação para esta parcela
+                const transacaoExistente = transactions.find(t => 
+                    t.faturaId === fatura.id && 
+                    t.parcelaNumero === parcela.numero
+                );
+                
+                if (!transacaoExistente) {
+                    const novaTransacao = {
+                        id: Date.now() + Math.random(),
+                        date: parcela.data,
+                        type: "Despesa",
+                        category: `Fatura ${fatura.cartao} - ${fatura.banco}`,
+                        amount: parcela.valor,
+                        obs: `[Despesa Cartão] ${fatura.descricao || `${fatura.cartao} / ${fatura.banco}`} - Parcela ${parcela.numero}/${fatura.parcelas}`,
+                        faturaId: fatura.id,
+                        parcelaNumero: parcela.numero
+                    };
+                    
+                    transactions.push(novaTransacao);
+                }
+            });
         });
     }
     

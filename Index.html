@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
         <link rel="stylesheet" href="styles.css">
 </head>
@@ -29,29 +30,43 @@
         </div>
 
         <div class="header-right">
-            <div class="stats-card">
-                <div class="stat-item receita">
-                    <span class="stat-label">Receitas</span>
-                    <div class="stat-value" id="totalReceitas">R$ 0,00</div>
+            <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-end;">
+                <div class="stats-card" style="display: flex; flex-direction: row; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: flex-end;">
+                    <div class="stat-item receita">
+                        <span class="stat-label">Receitas</span>
+                        <div class="stat-value" id="totalReceitas">R$ 0,00</div>
+                    </div>
+                    <div class="stat-item saldo">
+                        <span class="stat-label">Saldo do Mês</span>
+                        <div class="stat-value" id="saldoMes">R$ 0,00</div>
+                    </div>
                 </div>
-                <div class="stat-item despesa">
-                    <span class="stat-label">Despesas</span>
-                    <div class="stat-value" id="totalDespesas">R$ 0,00</div>
-                </div>
-                <div class="stat-item saldo">
-                    <span class="stat-label">Saldo do Mês</span>
-                    <div class="stat-value" id="saldoMes">R$ 0,00</div>
+                
+                <div class="stats-card" style="display: flex; flex-direction: row; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: flex-end;">
+                    <div class="stat-item despesa">
+                        <span class="stat-label">Despesas Totais</span>
+                        <div class="stat-value" id="totalDespesas">R$ 0,00</div>
+                    </div>
+                    <div class="stat-item" style="background: rgba(255, 255, 255, 0.12); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px; padding: 10px 14px; min-width: 140px;">
+                        <span class="stat-label">Despesas Recorrentes</span>
+                        <div class="stat-value" id="totalDespesasRecorrentes" style="color: #FFCDD2; font-size: 0.95rem;">R$ 0,00</div>
+                    </div>
+                    <div class="stat-item" style="background: rgba(255, 255, 255, 0.12); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px; padding: 10px 14px; min-width: 140px;">
+                        <span class="stat-label">Despesas Cartões</span>
+                        <div class="stat-value" id="totalFaturasRecorrentes" style="color: #FFCDD2; font-size: 0.95rem;">R$ 0,00</div>
+                    </div>
                 </div>
             </div>
-            <div class="relatorios-container month-nav">
-                <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center; justify-content: flex-end;">
+            
+            <div class="relatorios-container month-nav" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center; justify-content: center;">
                     <button onclick="mostrarRelatorio(-1)" style="font-size: 0.85rem; padding: 8px 12px;">← Mês Anterior</button>
                     <div id="mesReferencia" style="text-align: center; padding: 8px 12px; background: rgba(255,255,255,0.2); border-radius: 8px; font-weight: 600; font-size: 0.9rem; min-width: 150px;">
                         Mês de Referência
                     </div>
                     <button onclick="mostrarRelatorio(1)" style="font-size: 0.85rem; padding: 8px 12px;">Próximo Mês →</button>
                 </div>
-                <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end;">
+                <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: center;">
                     <button onclick="mostrarRelatorio(0)" style="font-size: 0.85rem; padding: 8px 12px;">Mês Atual</button>
                 </div>
             </div>
@@ -93,8 +108,10 @@
                         <button type="button" class="btn-clear" onclick="clearForm()">Limpar</button>
                     </div>
                     <div class="btn-group">
-                        <button type="button" class="btn-export" onclick="exportCSV()">Exportar CSV</button>
-                        <button type="button" class="btn-pdf" onclick="generatePDF()">Gerar PDF</button>
+                        <button type="button" class="btn-export" onclick="exportExcel()" style="padding: 8px 16px; font-size: 0.85rem;">
+                            <i class="fas fa-file-excel"></i> Exportar Excel
+                        </button>
+                        <button type="button" class="btn-pdf" onclick="generatePDF()" style="padding: 8px 16px; font-size: 0.85rem;">Gerar PDF</button>
                     </div>
                 </form>
 
@@ -144,17 +161,17 @@
             </div>
         </section>
 
-        <!-- Seção de Faturas Parceladas -->
+        <!-- Seção de Faturas Recorrentes -->
         <section class="full-col" style="grid-column: 1 / -1; margin-top: 25px;">
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px;">
-                    <h3 style="color: var(--primary-blue); font-size: 1.3rem; font-weight: 700;">💳 Faturas Parceladas</h3>
+                    <h3 style="color: var(--primary-blue); font-size: 1.3rem; font-weight: 700;">💳 Despesas Cartões</h3>
                     <button onclick="toggleFaturaForm()" class="btn-add" style="flex: 0 1 auto;">
-                        <i class="fas fa-plus"></i> Nova Fatura Parcelada
+                        <i class="fas fa-plus"></i> Nova Despesa Cartão
                     </button>
                 </div>
 
-                <!-- Formulário de Fatura Parcelada (inicialmente oculto) -->
+                <!-- Formulário de Despesa Cartão (inicialmente oculto) -->
                 <div id="faturaFormContainer" style="display: none; background: var(--bg-light); padding: 25px; border-radius: 16px; margin-bottom: 25px;">
                     <form id="faturaForm">
                         <div class="row">
@@ -215,7 +232,7 @@
                         </div>
 
                         <div class="btn-group">
-                            <button type="submit" class="btn-add">Salvar Fatura</button>
+                            <button type="submit" class="btn-add">Salvar Despesa Cartão</button>
                             <button type="button" class="btn-clear" onclick="toggleFaturaForm()">Cancelar</button>
                         </div>
                     </form>
@@ -255,7 +272,7 @@
 
                 <!-- Tabela de Faturas -->
                 <div class="summary-table-container">
-                    <h4 style="margin-bottom:15px; color:#333;">Faturas Parceladas</h4>
+                    <h4 style="margin-bottom:15px; color:#333;">Despesas Cartões</h4>
                     <table id="faturasTable">
                         <thead>
                             <tr>
