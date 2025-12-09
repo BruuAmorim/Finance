@@ -73,6 +73,9 @@ document.addEventListener("DOMContentLoaded", () => {
         faturaParcelas.addEventListener('change', calcularUltimaParcelaAuto);
         faturaParcelas.addEventListener('input', calcularUltimaParcelaAuto);
     }
+
+    // Carregar preferência de modo escuro
+    carregarModoEscuro();
 });
 
 // ===============================
@@ -1736,4 +1739,60 @@ function removerDespesaRecorrente(despesaId) {
     salvarLocal();
     atualizarTabelaDespesasRecorrentes();
     updateUI(currentMonth, currentYear);
+}
+
+// ===============================
+//  MODO ESCURO
+// ===============================
+function toggleDarkMode() {
+    const body = document.body;
+    const darkModeIcon = document.getElementById('darkModeIcon');
+    
+    // Alternar classe dark-mode
+    body.classList.toggle('dark-mode');
+    
+    // Verificar se o modo escuro está ativo
+    const isDarkMode = body.classList.contains('dark-mode');
+    
+    // Atualizar ícone
+    if (isDarkMode) {
+        darkModeIcon.classList.remove('fa-moon');
+        darkModeIcon.classList.add('fa-sun');
+    } else {
+        darkModeIcon.classList.remove('fa-sun');
+        darkModeIcon.classList.add('fa-moon');
+    }
+    
+    // Salvar preferência no localStorage
+    localStorage.setItem('darkMode', isDarkMode ? 'enabled' : 'disabled');
+    
+    // Atualizar gráficos se necessário (Chart.js pode precisar de atualização)
+    if (lineChart && pieChart) {
+        setTimeout(() => {
+            lineChart.resize();
+            pieChart.resize();
+        }, 100);
+    }
+}
+
+function carregarModoEscuro() {
+    const darkModePreference = localStorage.getItem('darkMode');
+    const body = document.body;
+    const darkModeIcon = document.getElementById('darkModeIcon');
+    
+    // Se houver preferência salva, aplicar
+    if (darkModePreference === 'enabled') {
+        body.classList.add('dark-mode');
+        if (darkModeIcon) {
+            darkModeIcon.classList.remove('fa-moon');
+            darkModeIcon.classList.add('fa-sun');
+        }
+    } else if (darkModePreference === 'disabled') {
+        body.classList.remove('dark-mode');
+        if (darkModeIcon) {
+            darkModeIcon.classList.remove('fa-sun');
+            darkModeIcon.classList.add('fa-moon');
+        }
+    }
+    // Se não houver preferência, manter o padrão do sistema (via CSS media query)
 }
