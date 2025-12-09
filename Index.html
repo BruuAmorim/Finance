@@ -12,7 +12,7 @@
 
     <style>
         :root {
-            /* Paleta EvaCloudd profissional */
+            /* Paleta EvaCloudd profissional*/
             --primary-blue: #1565C0; /* Azul principal EvaCloudd */
             --secondary-blue: #42A5F5; /* Azul claro */
             --accent-blue: #2196F3; /* Azul accent */
@@ -101,6 +101,28 @@
             gap: 20px;
             position: relative;
             overflow: hidden;
+        }
+
+        .header-left {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex: 1;
+        }
+
+        .header-right {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: flex-end;
+            min-width: 280px;
+        }
+
+        .month-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-end;
         }
 
         header::before {
@@ -705,36 +727,38 @@
 <body>
 
     <header>
-        <div style="display: flex; flex-direction: column; gap: 15px; flex: 1;">
+        <div class="header-left">
             <div class="header-title">
                 <h1>EvaCloudd Finance </h1>
                 <p>Controle financeiro digital e integrado.</p>
             </div>
-            <div class="relatorios-container" style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
-                <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center;">
+        </div>
+        <div class="header-right">
+            <div class="stats-card">
+                <div class="stat-item receita">
+                    <span class="stat-label">Receitas</span>
+                    <div class="stat-value" id="totalReceitas">R$ 0,00</div>
+                </div>
+                <div class="stat-item despesa">
+                    <span class="stat-label">Despesas</span>
+                    <div class="stat-value" id="totalDespesas">R$ 0,00</div>
+                </div>
+                <div class="stat-item saldo">
+                    <span class="stat-label">Saldo do Mês</span>
+                    <div class="stat-value" id="saldoMes">R$ 0,00</div>
+                </div>
+            </div>
+            <div class="relatorios-container month-nav">
+                <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center; justify-content: flex-end;">
                     <button onclick="mostrarRelatorio(-1)" style="font-size: 0.85rem; padding: 8px 12px;">← Mês Anterior</button>
                     <div id="mesReferencia" style="text-align: center; padding: 8px 12px; background: rgba(255,255,255,0.2); border-radius: 8px; font-weight: 600; font-size: 0.9rem; min-width: 150px;">
                         Mês de Referência
                     </div>
                     <button onclick="mostrarRelatorio(1)" style="font-size: 0.85rem; padding: 8px 12px;">Próximo Mês →</button>
                 </div>
-                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end;">
                     <button onclick="mostrarRelatorio(0)" style="font-size: 0.85rem; padding: 8px 12px;">Mês Atual</button>
                 </div>
-            </div>
-        </div>
-        <div class="stats-card">
-            <div class="stat-item receita">
-                <span class="stat-label">Receitas</span>
-                <div class="stat-value" id="totalReceitas">R$ 0,00</div>
-            </div>
-            <div class="stat-item despesa">
-                <span class="stat-label">Despesas</span>
-                <div class="stat-value" id="totalDespesas">R$ 0,00</div>
-            </div>
-            <div class="stat-item saldo">
-                <span class="stat-label">Saldo do Mês</span>
-                <div class="stat-value" id="saldoMes">R$ 0,00</div>
             </div>
         </div>
     </header>
