@@ -43,6 +43,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if (faturaForm) {
         faturaForm.addEventListener("submit", adicionarFaturaParcelada);
     }
+
+    // Adicionar event listeners para calcular automaticamente a última parcela
+    const faturaDataInicio = document.getElementById('faturaDataInicio');
+    const faturaParcelas = document.getElementById('faturaParcelas');
+    
+    if (faturaDataInicio) {
+        faturaDataInicio.addEventListener('change', calcularUltimaParcelaAuto);
+    }
+    if (faturaParcelas) {
+        faturaParcelas.addEventListener('change', calcularUltimaParcelaAuto);
+        faturaParcelas.addEventListener('input', calcularUltimaParcelaAuto);
+    }
 });
 
 // ===============================
@@ -506,6 +518,46 @@ function toggleFaturaForm() {
     const container = document.getElementById('faturaFormContainer');
     if (container) {
         container.style.display = container.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+// Preenche automaticamente a data de vencimento final com base na 1ª parcela e no total
+function preencherUltimaParcela() {
+    const inicioEl = document.getElementById('faturaDataInicio');
+    const parcelasEl = document.getElementById('faturaParcelas');
+    const vencimentoEl = document.getElementById('faturaDataVencimento');
+
+    if (!inicioEl || !parcelasEl || !vencimentoEl) return;
+
+    const inicio = inicioEl.value;
+    const parcelas = parseInt(parcelasEl.value);
+
+    if (!inicio || !parcelas || parcelas <= 0) {
+        alert("Informe a data da primeira parcela e o número total de parcelas.");
+        return;
+    }
+
+    const dataFinal = new Date(inicio);
+    dataFinal.setMonth(dataFinal.getMonth() + (parcelas - 1));
+    vencimentoEl.valueAsDate = dataFinal;
+}
+
+// Calcula automaticamente a última parcela quando os campos mudam
+function calcularUltimaParcelaAuto() {
+    const inicioEl = document.getElementById('faturaDataInicio');
+    const parcelasEl = document.getElementById('faturaParcelas');
+    const vencimentoEl = document.getElementById('faturaDataVencimento');
+
+    if (!inicioEl || !parcelasEl || !vencimentoEl) return;
+
+    const inicio = inicioEl.value;
+    const parcelas = parseInt(parcelasEl.value);
+
+    // Só calcula se ambos os campos estiverem preenchidos
+    if (inicio && parcelas && parcelas > 0) {
+        const dataFinal = new Date(inicio);
+        dataFinal.setMonth(dataFinal.getMonth() + (parcelas - 1));
+        vencimentoEl.valueAsDate = dataFinal;
     }
 }
 
