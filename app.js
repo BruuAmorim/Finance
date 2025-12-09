@@ -3,6 +3,7 @@
 // ===============================
 let transactions = [];
 let faturasParceladas = [];
+let despesasRecorrentes = [];
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
 
@@ -21,6 +22,11 @@ document.addEventListener("DOMContentLoaded", () => {
         faturasParceladas = JSON.parse(dadosFaturas);
     }
 
+    const dadosDespesasRecorrentes = localStorage.getItem("despesasRecorrentes");
+    if (dadosDespesasRecorrentes) {
+        despesasRecorrentes = JSON.parse(dadosDespesasRecorrentes);
+    }
+
     document.getElementById('date').valueAsDate = new Date();
     const hoje = new Date();
     document.getElementById('faturaDataInicio').valueAsDate = hoje;
@@ -28,9 +34,14 @@ document.addEventListener("DOMContentLoaded", () => {
     proximoMes.setMonth(proximoMes.getMonth() + 1);
     document.getElementById('faturaDataVencimento').valueAsDate = proximoMes;
     initCharts();
+    
+    // Gerar transações automáticas de despesas recorrentes
+    gerarTransacoesRecorrentes();
+    
     updateUI(currentMonth, currentYear);
     atualizarTabelaFaturas();
     atualizarFiltros();
+    atualizarTabelaDespesasRecorrentes();
     
     // Adicionar event listener ao formulário
     const form = document.getElementById("expenseForm");
@@ -42,6 +53,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const faturaForm = document.getElementById("faturaForm");
     if (faturaForm) {
         faturaForm.addEventListener("submit", adicionarFaturaParcelada);
+    }
+
+    // Adicionar event listener ao formulário de despesas recorrentes
+    const despesaRecorrenteForm = document.getElementById("despesaRecorrenteForm");
+    if (despesaRecorrenteForm) {
+        despesaRecorrenteForm.addEventListener("submit", adicionarDespesaRecorrente);
     }
 
     // Adicionar event listeners para calcular automaticamente a última parcela
@@ -939,4 +956,344 @@ function removerFatura(faturaId) {
     salvarFaturasLocal();
     atualizarTabelaFaturas();
     atualizarFiltros();
+}
+
+// ===============================
+//  DESPESAS RECORRENTES
+// ===============================
+
+function salvarDespesasRecorrentesLocal() {
+    localStorage.setItem("despesasRecorrentes", JSON.stringify(despesasRecorrentes));
+}
+
+function toggleDespesaRecorrenteForm() {
+    const container = document.getElementById('despesaRecorrenteFormContainer');
+    if (container) {
+        container.style.display = container.style.display === 'none' ? 'block' : 'none';
+        if (container.style.display === 'block') {
+            const hoje = new Date();
+            document.getElementById('despesaRecorrenteInicio').valueAsDate = hoje;
+        }
+    }
+}
+
+function adicionarDespesaRecorrente(e) {
+    e.preventDefault();
+
+    const descricao = document.getElementById('despesaRecorrenteDescricao').value.trim();
+    const categoria = document.getElementById('despesaRecorrenteCategoria').value.trim();
+    const valor = parseFloat(document.getElementById('despesaRecorrenteValor').value);
+    const dia = parseInt(document.getElementById('despesaRecorrenteDia').value);
+    const inicio = document.getElementById('despesaRecorrenteInicio').value;
+    const termino = document.getElementById('despesaRecorrenteTermino').value;
+    const obs = document.getElementById('despesaRecorrenteObs').value.trim();
+
+    if (!descricao || !categoria || isNaN(valor) || valor <= 0 || !dia || dia < 1 || dia > 31 || !inicio) {
+        alert("Preencha todos os campos obrigatórios corretamente!");
+        return;
+    }
+
+    const novaDespesaRecorrente = {
+        id: Date.now(),
+        descricao,
+        categoria,
+        valor,
+        dia,
+        inicio,
+        termino: termino || null,
+        obs: obs || "",
+        ativa: true,
+        dataCriacao: new Date().toISOString()
+    };
+
+    despesasRecorrentes.push(novaDespesaRecorrente);
+    salvarDespesasRecorrentesLocal();
+    
+    // Gerar transações para meses futuros
+    gerarTransacoesRecorrentes();
+    
+    atualizarTabelaDespesasRecorrentes();
+    updateUI(currentMonth, currentYear);
+    document.getElementById('despesaRecorrenteForm').reset();
+    toggleDespesaRecorrenteForm();
+
+    alert("Despesa recorrente adicionada com sucesso!");
+}
+
+function gerarTransacoesRecorrentes() {
+    const hoje = new Date();
+    const mesAtual = hoje.getMonth();
+    const anoAtual = hoje.getFullYear();
+    
+    // Gerar transações para os próximos 12 meses
+    for (let mesesAdicionar = 0; mesesAdicionar < 12; mesesAdicionar++) {
+        const dataAlvo = new Date(anoAtual, mesAtual + mesesAdicionar, 1);
+        const anoAlvo = dataAlvo.getFullYear();
+        const mesAlvo = dataAlvo.getMonth();
+        
+        despesasRecorrentes.forEach(despesa => {
+            if (!despesa.ativa) return;
+            
+            const dataInicio = new Date(despesa.inicio);
+            const dataTermino = despesa.termino ? new Date(despesa.termino) : null;
+            
+            // Verificar se a despesa já começou
+            if (anoAlvo < dataInicio.getFullYear() || 
+                (anoAlvo === dataInicio.getFullYear() && mesAlvo < dataInicio.getMonth())) {
+                return;
+            }
+            
+            // Verificar se a despesa já terminou
+            if (dataTermino) {
+                if (anoAlvo > dataTermino.getFullYear() || 
+                    (anoAlvo === dataTermino.getFullYear() && mesAlvo > dataTermino.getMonth())) {
+                    return;
+                }
+            }
+            
+            // Criar data da transação
+            const diaTransacao = Math.min(despesa.dia, new Date(anoAlvo, mesAlvo + 1, 0).getDate());
+            const dataTransacao = new Date(anoAlvo, mesAlvo, diaTransacao);
+            const dataTransacaoStr = dataTransacao.toISOString().split('T')[0];
+            
+            // Verificar se já existe uma transação para esta despesa neste mês
+            const transacaoExistente = transactions.find(t => 
+                t.recorrenteId === despesa.id && 
+                t.date === dataTransacaoStr
+            );
+            
+            if (!transacaoExistente) {
+                const novaTransacao = {
+                    id: Date.now() + Math.random(),
+                    date: dataTransacaoStr,
+                    type: "Despesa",
+                    category: despesa.categoria,
+                    amount: despesa.valor,
+                    obs: despesa.obs || `[Recorrente] ${despesa.descricao}`,
+                    recorrenteId: despesa.id
+                };
+                
+                transactions.push(novaTransacao);
+            }
+        });
+    }
+    
+    salvarLocal();
+}
+
+function atualizarTabelaDespesasRecorrentes() {
+    const tbody = document.getElementById('despesasRecorrentesTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (despesasRecorrentes.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-light);">
+                    Nenhuma despesa recorrente cadastrada.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    despesasRecorrentes.forEach(despesa => {
+        const valorFormatado = despesa.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const dataInicio = new Date(despesa.inicio).toLocaleDateString('pt-BR');
+        const dataTermino = despesa.termino ? new Date(despesa.termino).toLocaleDateString('pt-BR') : 'Permanente';
+        
+        const hoje = new Date();
+        const dataTerminoObj = despesa.termino ? new Date(despesa.termino) : null;
+        let status = despesa.ativa ? 'Ativa' : 'Inativa';
+        let statusClass = despesa.ativa ? 'accent-green' : 'accent-red';
+        
+        if (despesa.ativa && dataTerminoObj && hoje > dataTerminoObj) {
+            status = 'Encerrada';
+            statusClass = 'accent-red';
+        }
+
+        tbody.innerHTML += `
+            <tr style="opacity: ${despesa.ativa ? '1' : '0.6'};">
+                <td style="font-weight: 600;">${despesa.descricao}</td>
+                <td>${despesa.categoria}</td>
+                <td style="font-weight: 600; color: var(--accent-red);">${valorFormatado}</td>
+                <td>Dia ${despesa.dia}</td>
+                <td>${dataInicio}</td>
+                <td>${dataTermino}</td>
+                <td style="color: var(--${statusClass}); font-weight: 600;">${status}</td>
+                <td>
+                    <button onclick="abrirModalEditarDespesaRecorrente(${despesa.id})" class="btn-export" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button onclick="alternarStatusDespesaRecorrente(${despesa.id})" class="btn-export" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
+                        <i class="fas fa-${despesa.ativa ? 'pause' : 'play'}"></i> ${despesa.ativa ? 'Desativar' : 'Ativar'}
+                    </button>
+                    <button onclick="removerDespesaRecorrente(${despesa.id})" class="btn-clear" style="padding: 6px 12px; font-size: 0.85rem;">
+                        <i class="fas fa-trash"></i> Remover
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+function abrirModalEditarDespesaRecorrente(despesaId) {
+    const despesa = despesasRecorrentes.find(d => d.id === despesaId);
+    if (!despesa) return;
+
+    const dataInicio = new Date(despesa.inicio).toISOString().split('T')[0];
+    const dataTermino = despesa.termino ? new Date(despesa.termino).toISOString().split('T')[0] : '';
+
+    let modalHTML = `
+        <div id="modalEditarDespesaRecorrente" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 20px; padding: 30px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="color: var(--primary-blue); margin: 0;">Editar Despesa Recorrente</h3>
+                    <button onclick="fecharModalEditarDespesaRecorrente()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-medium);">&times;</button>
+                </div>
+                <form id="formEditarDespesaRecorrente" onsubmit="salvarEdicaoDespesaRecorrente(event, ${despesaId})">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Categoria</label>
+                            <input type="text" id="editCategoria" value="${despesa.categoria}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Valor Mensal (R$)</label>
+                            <input type="number" id="editValor" step="0.01" value="${despesa.valor}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Dia do Mês</label>
+                        <input type="number" id="editDia" min="1" max="31" value="${despesa.dia}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Data de Início</label>
+                            <input type="date" id="editInicio" value="${dataInicio}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Data de Término (Opcional)</label>
+                            <input type="date" id="editTermino" value="${dataTermino}" style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                    </div>
+                    <small style="color: var(--text-light); font-size: 0.8rem; display: block; margin-bottom: 20px;">
+                        Deixe a data de término em branco para despesa permanente
+                    </small>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" onclick="fecharModalEditarDespesaRecorrente()" class="btn-clear">Cancelar</button>
+                        <button type="submit" class="btn-add">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+function fecharModalEditarDespesaRecorrente() {
+    const modal = document.getElementById('modalEditarDespesaRecorrente');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function salvarEdicaoDespesaRecorrente(e, despesaId) {
+    e.preventDefault();
+
+    const despesa = despesasRecorrentes.find(d => d.id === despesaId);
+    if (!despesa) return;
+
+    const novaCategoria = document.getElementById('editCategoria').value.trim();
+    const novoValor = parseFloat(document.getElementById('editValor').value);
+    const novoDia = parseInt(document.getElementById('editDia').value);
+    const novoInicio = document.getElementById('editInicio').value;
+    const novoTermino = document.getElementById('editTermino').value;
+
+    if (!novaCategoria || isNaN(novoValor) || novoValor <= 0 || !novoDia || novoDia < 1 || novoDia > 31 || !novoInicio) {
+        alert("Preencha todos os campos corretamente!");
+        return;
+    }
+
+    // Remover transações futuras relacionadas para regenerar com novos dados
+    const hoje = new Date();
+    transactions = transactions.filter(t => {
+        if (t.recorrenteId === despesaId) {
+            const dataTransacao = new Date(t.date);
+            return dataTransacao < hoje;
+        }
+        return true;
+    });
+
+    // Atualizar dados da despesa
+    despesa.categoria = novaCategoria;
+    despesa.valor = novoValor;
+    despesa.dia = novoDia;
+    despesa.inicio = novoInicio;
+    despesa.termino = novoTermino || null;
+
+    salvarDespesasRecorrentesLocal();
+    
+    // Regenerar transações com os novos dados
+    if (despesa.ativa) {
+        gerarTransacoesRecorrentes();
+    }
+    
+    salvarLocal();
+    fecharModalEditarDespesaRecorrente();
+    atualizarTabelaDespesasRecorrentes();
+    updateUI(currentMonth, currentYear);
+
+    alert("Despesa recorrente atualizada com sucesso!");
+}
+
+function alternarStatusDespesaRecorrente(despesaId) {
+    const despesa = despesasRecorrentes.find(d => d.id === despesaId);
+    if (!despesa) return;
+
+    despesa.ativa = !despesa.ativa;
+    
+    // Se estiver desativando, remover transações futuras
+    if (!despesa.ativa) {
+        const hoje = new Date();
+        transactions = transactions.filter(t => {
+            if (t.recorrenteId === despesaId) {
+                const dataTransacao = new Date(t.date);
+                return dataTransacao < hoje;
+            }
+            return true;
+        });
+        salvarLocal();
+    }
+    
+    salvarDespesasRecorrentesLocal();
+    
+    // Se estiver ativando, gerar transações novamente
+    if (despesa.ativa) {
+        gerarTransacoesRecorrentes();
+    }
+    
+    atualizarTabelaDespesasRecorrentes();
+    updateUI(currentMonth, currentYear);
+}
+
+function removerDespesaRecorrente(despesaId) {
+    if (!confirm("Deseja remover esta despesa recorrente? As transações já geradas não serão removidas.")) return;
+
+    // Remover transações futuras relacionadas
+    const hoje = new Date();
+    transactions = transactions.filter(t => {
+        if (t.recorrenteId === despesaId) {
+            const dataTransacao = new Date(t.date);
+            return dataTransacao < hoje;
+        }
+        return true;
+    });
+    
+    despesasRecorrentes = despesasRecorrentes.filter(d => d.id !== despesaId);
+    salvarDespesasRecorrentesLocal();
+    salvarLocal();
+    atualizarTabelaDespesasRecorrentes();
+    updateUI(currentMonth, currentYear);
 }
