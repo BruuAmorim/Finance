@@ -249,7 +249,9 @@
             border: 1px solid var(--gray-border);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
-            overflow: hidden;
+            overflow: visible;
+            box-sizing: border-box;
+            min-width: 0;
         }
 
         .card::before {
@@ -576,6 +578,13 @@
             border-radius: 16px;
             padding: 16px;
             box-shadow: var(--shadow-sm);
+            overflow: visible;
+            box-sizing: border-box;
+        }
+
+        .chart-container canvas {
+            max-width: 100%;
+            height: auto !important;
         }
 
         .chart-box h4 {
@@ -740,5 +749,508 @@
             #faturasTable th,
             #faturasTable td {
                 padding: 10px 8px;
+            }
+        }
+
+        /* =============================== */
+        /* RESPONSIVIDADE MOBILE COMPLETA */
+        /* =============================== */
+
+        /* Tablet e Mobile (até 768px) */
+        @media (max-width: 768px) {
+            /* Header - Layout em coluna */
+            header {
+                grid-template-columns: 1fr;
+                padding: 1.5rem 4%;
+                gap: 20px;
+            }
+
+            .header-left {
+                text-align: center;
+                align-items: center;
+            }
+
+            .header-center {
+                display: none; /* Oculta ilustração no mobile */
+            }
+
+            .header-right {
+                align-items: center;
+                width: 100%;
+            }
+
+            .header-title h1 {
+                font-size: 1.5rem;
+            }
+
+            .header-title p {
+                font-size: 0.85rem;
+            }
+
+            /* Cards de Estatísticas */
+            .stats-card {
+                width: 100%;
+                justify-content: center !important;
+            }
+
+            .stat-item {
+                min-width: 120px !important;
+                padding: 8px 12px !important;
+            }
+
+            .stat-item .stat-label {
+                font-size: 0.6rem;
+            }
+
+            .stat-item .stat-value {
+                font-size: 0.95rem;
+            }
+
+            /* Navegação de Mês */
+            .relatorios-container.month-nav {
+                width: 100%;
+            }
+
+            .relatorios-container.month-nav > div {
+                width: 100%;
+            }
+
+            .relatorios-container.month-nav button {
+                font-size: 0.75rem !important;
+                padding: 6px 10px !important;
+                flex: 1;
+                min-width: 0;
+            }
+
+            #mesReferencia {
+                min-width: 120px !important;
+                font-size: 0.8rem !important;
+                padding: 6px 10px !important;
+            }
+
+            /* Container Principal */
+            .container {
+                grid-template-columns: 1fr;
+                padding: 0 15px;
+                margin: 20px auto;
+                gap: 20px;
+                max-width: 100%;
+                overflow-x: hidden;
+            }
+
+            /* Garantir que seções não cortem conteúdo */
+            section {
+                overflow: visible;
+                min-width: 0;
+            }
+
+            .left-col, .right-col {
+                overflow: visible;
+                min-width: 0;
+            }
+
+            /* Cards */
+            .card {
+                padding: 20px;
+                border-radius: 16px;
+                overflow: visible;
+                min-width: 0;
+            }
+
+            .right-col .card {
+                overflow: visible;
+            }
+
+            /* Formulários */
+            .row {
+                flex-direction: column;
+            }
+
+            input, select, textarea {
+                padding: 12px 15px;
+                font-size: 0.9rem;
+            }
+
+            /* Botões */
+            button {
+                padding: 12px 18px;
+                font-size: 0.85rem;
+                white-space: nowrap;
+                overflow: visible;
+            }
+
+            .btn-group {
+                flex-direction: column;
+                width: 100%;
+                gap: 10px;
+            }
+
+            .btn-group button {
+                width: 100%;
+                min-width: 0;
+            }
+
+            .btn-add, .btn-clear, .btn-export, .btn-pdf {
+                flex: 1;
+                width: 100%;
+            }
+
+            /* Botões PDF na área de gráficos */
+            .right-col .card > div:first-child {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                width: 100%;
+                margin-bottom: 20px;
+            }
+
+            .right-col .card > div:first-child button {
+                width: 100%;
+                padding: 10px 15px;
+            }
+
+            /* Tabelas - Scroll Horizontal */
+            .summary-table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                margin-left: -20px;
+                margin-right: -20px;
+                padding-left: 20px;
+                padding-right: 20px;
+                width: calc(100% + 40px);
+            }
+
+            table {
+                min-width: 600px;
+                font-size: 0.8rem;
+            }
+
+            table th,
+            table td {
+                padding: 8px 6px;
+                white-space: nowrap;
+            }
+
+            #faturasTable,
+            #despesasRecorrentesTable {
+                font-size: 0.75rem;
+            }
+
+            #faturasTable th,
+            #faturasTable td,
+            #despesasRecorrentesTable th,
+            #despesasRecorrentesTable td {
+                padding: 8px 4px;
+            }
+
+            /* Gráficos */
+            .charts-area {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                width: 100%;
+                overflow: visible;
+            }
+
+            .chart-box {
+                padding: 15px;
+                width: 100%;
+                overflow: visible;
+                min-width: 0;
+            }
+
+            .chart-container {
+                height: 280px;
+                width: 100%;
+                min-height: 250px;
+                overflow: visible;
+                padding: 10px;
+                box-sizing: border-box;
+            }
+
+            .chart-container canvas {
+                max-width: 100% !important;
+                height: auto !important;
+            }
+
+            /* Lista de Transações */
+            .transaction-list {
+                max-height: 300px;
+            }
+
+            .transaction-item {
+                padding: 12px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .transaction-item .t-info {
+                width: 100%;
+            }
+
+            /* Seções Full Width */
+            .full-col {
+                margin-top: 20px;
+            }
+
+            /* Footer */
+            footer {
+                padding: 20px 15px;
+                margin-top: 40px;
+            }
+
+            footer p {
+                font-size: 0.8rem;
+            }
+        }
+
+        /* Mobile Pequeno (até 480px) */
+        @media (max-width: 480px) {
+            /* Header */
+            header {
+                padding: 1.2rem 3%;
+                border-bottom-left-radius: 24px;
+                border-bottom-right-radius: 24px;
+            }
+
+            .header-title h1 {
+                font-size: 1.3rem;
+            }
+
+            .header-title p {
+                font-size: 0.8rem;
+            }
+
+            /* Cards de Estatísticas - Uma coluna */
+            .stats-card {
+                flex-direction: column !important;
+            }
+
+            .stat-item {
+                width: 100% !important;
+                min-width: 100% !important;
+            }
+
+            /* Botões de Navegação */
+            .relatorios-container.month-nav > div:first-child {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .relatorios-container.month-nav button {
+                width: 100%;
+            }
+
+            #mesReferencia {
+                width: 100%;
+                min-width: 100% !important;
+            }
+
+            /* Container */
+            .container {
+                padding: 0 10px;
+                margin: 15px auto;
+            }
+
+            /* Cards */
+            .card {
+                padding: 15px;
+                border-radius: 12px;
+            }
+
+            /* Inputs */
+            input, select, textarea {
+                padding: 10px 12px;
+                font-size: 0.85rem;
+            }
+
+            /* Botões */
+            button {
+                padding: 10px 15px;
+                font-size: 0.8rem;
+            }
+
+            /* Tabelas */
+            table {
+                min-width: 700px;
+                font-size: 0.75rem;
+            }
+
+            table th {
+                font-size: 0.7rem;
+                padding: 6px 4px;
+            }
+
+            table td {
+                padding: 6px 4px;
+                font-size: 0.7rem;
+            }
+
+            /* Gráficos */
+            .charts-area {
+                width: 100%;
+                overflow: visible;
+            }
+
+            .chart-box {
+                width: 100%;
+                overflow: visible;
+                padding: 10px;
+            }
+
+            .chart-container {
+                height: 260px;
+                min-height: 260px;
+                padding: 12px;
+                width: 100%;
+                overflow: visible;
+                box-sizing: border-box;
+            }
+
+            .chart-container canvas {
+                max-width: 100% !important;
+                height: auto !important;
+            }
+
+            /* Títulos de Seção */
+            h3 {
+                font-size: 1.1rem;
+            }
+
+            h4 {
+                font-size: 0.95rem;
+            }
+
+            /* Labels de Formulário */
+            .form-group label {
+                font-size: 0.85rem;
+            }
+
+            /* Modais e Containers de Formulário */
+            #faturaFormContainer,
+            #despesaRecorrenteFormContainer {
+                padding: 15px !important;
+            }
+
+            /* Botões de Ação nas Tabelas */
+            table td button {
+                padding: 4px 8px !important;
+                font-size: 0.7rem !important;
+                margin: 2px !important;
+                display: inline-block;
+            }
+
+            table td {
+                position: relative;
+            }
+
+            /* Títulos de Seções com Botões */
+            .full-col .card > div:first-child {
+                flex-direction: column;
+                align-items: flex-start !important;
+            }
+
+            .full-col .card > div:first-child button {
+                width: 100%;
+                margin-top: 10px;
+            }
+        }
+
+        /* Landscape Mobile (480px - 768px em landscape) */
+        @media (max-width: 768px) and (orientation: landscape) {
+            .header-center {
+                display: none;
+            }
+
+            .stats-card {
+                flex-direction: row !important;
+            }
+
+            .stat-item {
+                min-width: 100px !important;
+            }
+        }
+
+        /* Ajustes Adicionais para Tabelas em Mobile */
+        @media (max-width: 768px) {
+            /* Container de Scroll para Tabelas */
+            .summary-table-container {
+                position: relative;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .summary-table-container::after {
+                content: '← Arraste para ver mais →';
+                display: block;
+                text-align: center;
+                padding: 8px;
+                font-size: 0.75rem;
+                color: var(--text-medium);
+                background: var(--bg-light);
+                border-radius: 8px;
+                margin-top: 10px;
+            }
+
+            /* Botões de PDF no mobile */
+            .right-col .card {
+                overflow: visible;
+                padding: 20px 15px;
+            }
+
+            .right-col .card > div:first-child {
+                flex-direction: column;
+                gap: 10px;
+                width: 100%;
+                margin-bottom: 20px;
+            }
+
+            .right-col .card > div:first-child button {
+                width: 100%;
+                font-size: 0.85rem !important;
+                padding: 12px 15px !important;
+                white-space: normal;
+            }
+
+            /* Garantir que gráficos não sejam cortados */
+            .charts-area {
+                width: 100%;
+                overflow: visible;
+                margin: 0;
+                padding: 0;
+            }
+
+            .chart-box {
+                width: 100%;
+                overflow: visible;
+                padding: 10px 0;
+                margin: 0;
+            }
+
+            .chart-container {
+                width: 100%;
+                overflow: visible;
+                padding: 10px;
+            }
+
+            /* Ajustar tamanho dos ícones */
+            button i {
+                font-size: 0.85em;
+            }
+
+            /* Melhorar espaçamento entre seções */
+            section.full-col {
+                margin-top: 20px;
+                overflow: visible;
+            }
+
+            section.full-col .card {
+                margin-bottom: 20px;
+                overflow: visible;
+            }
+
+            /* Garantir que cards não cortem conteúdo */
+            .card {
+                overflow: visible !important;
             }
         }
