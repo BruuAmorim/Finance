@@ -1,0 +1,1865 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EvaCloudd Finance - Gerenciador de Gastos</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        :root {
+            /* Paleta EvaCloudd profissional */
+            --primary-blue: #1565C0; /* Azul principal EvaCloudd */
+            --secondary-blue: #42A5F5; /* Azul claro */
+            --accent-blue: #2196F3; /* Azul accent */
+            --accent-green: #4CAF50; /* Verde sucesso */
+            --accent-red: #F44336; /* Vermelho despesa */
+            --bg-light: #F5F7FA;
+            --bg-white: #FFFFFF;
+            --text-dark: #263238;
+            --text-medium: #546E7A;
+            --text-light: #90A4AE;
+            --text-white: #FFFFFF;
+            --gray-border: #E0E7ED;
+            --shadow-sm: 0 2px 8px rgba(21, 101, 192, 0.08);
+            --shadow-md: 0 4px 16px rgba(21, 101, 192, 0.12);
+            --shadow-lg: 0 8px 32px rgba(21, 101, 192, 0.16);
+            --gradient-primary: linear-gradient(135deg, #1565C0 0%, #1976D2 100%);
+            --gradient-secondary: linear-gradient(135deg, #42A5F5 0%, #64B5F6 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #F5F7FA 0%, #E8ECF1 100%);
+            background-attachment: fixed;
+            color: var(--text-dark);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Ondas azuis no fundo (Estilo EvaCloudd) */
+        body::before, body::after {
+            content: '';
+            position: fixed;
+            border-radius: 50%;
+            z-index: -1;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        /* Onda Esquerda */
+        body::before {
+            width: 700px;
+            height: 700px;
+            background: linear-gradient(135deg, rgba(66, 165, 245, 0.25) 0%, rgba(144, 202, 249, 0.15) 100%);
+            top: -150px;
+            left: -250px;
+            animation-delay: 0s;
+        }
+
+        /* Onda Direita */
+        body::after {
+            width: 900px;
+            height: 900px;
+            background: linear-gradient(135deg, rgba(33, 150, 243, 0.2) 0%, rgba(100, 181, 246, 0.12) 100%);
+            bottom: -250px;
+            right: -350px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translate(0, 0) scale(1);
+            }
+            50% {
+                transform: translate(30px, -30px) scale(1.05);
+            }
+        }
+
+        /* Header */
+        header {
+            background: var(--gradient-primary);
+            color: white;
+            padding: 2rem 5%;
+            border-bottom-left-radius: 40px;
+            border-bottom-right-radius: 40px;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .header-title h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .header-title p {
+            font-size: 0.95rem;
+            opacity: 0.95;
+            font-weight: 400;
+            position: relative;
+            z-index: 1;
+        }
+
+        .stats-card {
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+            position: relative;
+            z-index: 1;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 8px 14px;
+            min-width: 100px;
+            text-align: center;
+            transition: all 0.3s ease;
+            flex: 0 1 auto;
+        }
+
+        .stat-item:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .stat-item .stat-label {
+            display: block;
+            font-size: 0.65rem;
+            opacity: 0.9;
+            margin-bottom: 4px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .stat-item .stat-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin: 0;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .stat-item.receita .stat-value {
+            color: #C8E6C9;
+        }
+
+        .stat-item.despesa .stat-value {
+            color: #FFCDD2;
+        }
+
+        .stat-item.saldo .stat-value {
+            color: #FFFFFF;
+        }
+
+        /* Container Principal */
+        .container {
+            max-width: 1200px;
+            margin: -30px auto 40px; /* Sobe um pouco para cima do header */
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 25px;
+        }
+
+        /* Cards Gerais */
+        .card {
+            background: var(--bg-white);
+            border-radius: 24px;
+            padding: 32px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-border);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--gradient-primary);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .card:hover::before {
+            transform: scaleX(1);
+        }
+
+        /* Formulário */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .row .form-group {
+            flex: 1;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid var(--gray-border);
+            border-radius: 12px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--bg-white);
+            color: var(--text-dark);
+            font-weight: 400;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--accent-blue);
+            background: var(--bg-white);
+            box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.1);
+            transform: translateY(-1px);
+        }
+
+        input::placeholder, textarea::placeholder {
+            color: var(--text-light);
+            font-weight: 400;
+        }
+
+        /* Botões */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 0.3px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+
+        button:active {
+            transform: scale(0.97) translateY(0);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+        }
+
+        .btn-add {
+            background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
+            color: white;
+            flex: 2;
+            box-shadow: 0 4px 16px rgba(76, 175, 80, 0.35);
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-add:hover {
+            box-shadow: 0 8px 24px rgba(76, 175, 80, 0.45);
+            transform: translateY(-3px);
+            background: linear-gradient(135deg, #45A049 0%, #5CB85C 100%);
+        }
+        
+        .btn-clear {
+            background-color: var(--bg-white);
+            color: var(--text-medium);
+            border: 2px solid var(--gray-border);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .btn-clear:hover {
+            background-color: #F5F7FA;
+            border-color: var(--text-medium);
+            color: var(--text-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+
+        .btn-export {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F5F7FA 100%);
+            color: var(--primary-blue);
+            border: 2px solid var(--primary-blue);
+            box-shadow: 0 2px 8px rgba(21, 101, 192, 0.15);
+        }
+
+        .btn-export:hover {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--accent-blue) 100%);
+            color: white;
+            border-color: var(--primary-blue);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(21, 101, 192, 0.35);
+        }
+
+        .btn-pdf {
+            background: var(--gradient-primary);
+            color: white;
+            box-shadow: 0 4px 16px rgba(21, 101, 192, 0.35);
+            font-weight: 600;
+        }
+
+        .btn-pdf:hover {
+            box-shadow: 0 8px 24px rgba(21, 101, 192, 0.45);
+            transform: translateY(-3px);
+            background: linear-gradient(135deg, #0D47A1 0%, #1565C0 100%);
+        }
+
+        .relatorios-container button {
+            flex: 0 1 auto;
+            min-width: auto;
+            font-size: 0.8rem;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(15px);
+            border: 2px solid rgba(255,255,255,0.3);
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 6px 12px;
+        }
+
+        .relatorios-container button:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .relatorios-container .btn-pdf {
+            background: linear-gradient(135deg, rgba(21, 101, 192, 0.9) 0%, rgba(33, 150, 243, 0.9) 100%);
+            backdrop-filter: blur(15px);
+            color: white;
+            font-size: 0.85rem;
+            padding: 10px 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            box-shadow: 0 4px 12px rgba(21, 101, 192, 0.3);
+        }
+
+        .relatorios-container .btn-pdf:hover {
+            background: linear-gradient(135deg, rgba(21, 101, 192, 1) 0%, rgba(33, 150, 243, 1) 100%);
+            box-shadow: 0 6px 20px rgba(21, 101, 192, 0.4);
+            transform: translateY(-3px);
+        }
+
+        #mesReferencia {
+            color: white;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            letter-spacing: 0.5px;
+            background: rgba(255,255,255,0.15) !important;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+            font-size: 0.85rem;
+        }
+
+        #mesReferencia:hover {
+            background: rgba(255,255,255,0.25) !important;
+            transform: scale(1.02);
+        }
+
+        /* Lista de Transações Recentes (Mini Dashboard na esquerda) */
+        .transaction-list {
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .transaction-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .transaction-list::-webkit-scrollbar-track {
+            background: var(--bg-light);
+            border-radius: 10px;
+        }
+
+        .transaction-list::-webkit-scrollbar-thumb {
+            background: var(--text-light);
+            border-radius: 10px;
+        }
+
+        .transaction-list::-webkit-scrollbar-thumb:hover {
+            background: var(--text-medium);
+        }
+
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid var(--gray-border);
+            animation: fadeIn 0.5s;
+            transition: all 0.3s ease;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            background: var(--bg-white);
+        }
+
+        .transaction-item:hover {
+            background: var(--bg-light);
+            transform: translateX(4px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .t-info h4 { 
+            font-size: 1rem; 
+            color: var(--text-dark);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .t-info span { 
+            font-size: 0.85rem; 
+            color: var(--text-medium);
+            font-weight: 400;
+        }
+        
+        .t-value { 
+            font-weight: 700;
+            font-size: 1.05rem;
+        }
+        
+        .income { 
+            color: var(--accent-green);
+        }
+        
+        .expense { 
+            color: var(--accent-red);
+        }
+
+        .actions i {
+            margin-left: 10px;
+            cursor: pointer;
+            color: var(--text-light);
+            transition: all 0.3s ease;
+            padding: 8px;
+            border-radius: 8px;
+        }
+        
+        .actions i:hover { 
+            color: var(--accent-red);
+            background: rgba(244, 67, 54, 0.1);
+            transform: scale(1.1);
+        }
+
+        /* Área dos Gráficos (Direita) */
+        .charts-area {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 280px;
+            width: 100%;
+            background: var(--bg-white);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .chart-box h4 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-blue);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chart-box h4::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: var(--gradient-primary);
+            border-radius: 2px;
+        }
+
+        /* Tabela Resumo */
+        .summary-table-container {
+            margin-top: 32px;
+            overflow-x: auto;
+            border-radius: 16px;
+            background: var(--bg-white);
+            padding: 8px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .summary-table-container h4 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-blue);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 8px;
+        }
+
+        .summary-table-container h4::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: var(--gradient-primary);
+            border-radius: 2px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 16px;
+            color: var(--text-medium);
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-bottom: 2px solid var(--gray-border);
+            background: var(--bg-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid var(--gray-border);
+            font-size: 0.9rem;
+            color: var(--text-dark);
+        }
+
+        tbody tr {
+            transition: all 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background: var(--bg-light);
+        }
+
+        /* Responsividade */
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+                margin-top: 20px;
+            }
+            .charts-area {
+                grid-template-columns: 1fr;
+            }
+            body::before, body::after {
+                display: none; /* Remove ondas no mobile para performance */
+            }
+        }
+
+        @keyframes fadeIn {
+            from { 
+                opacity: 0; 
+                transform: translateY(10px); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+        }
+
+        footer {
+            background: var(--bg-white);
+            border-top: 1px solid var(--gray-border);
+            margin-top: 60px;
+            padding: 30px 20px;
+        }
+
+        footer p {
+            color: var(--text-medium);
+            font-size: 0.875rem;
+            margin: 0;
+        }
+
+        /* Estilos para Faturas Parceladas */
+        .full-col {
+            width: 100%;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-dark);
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        #faturasTable {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        #faturasTable th {
+            background: var(--primary-blue);
+            color: white;
+            font-weight: 600;
+            text-align: left;
+            padding: 14px;
+            font-size: 0.875rem;
+        }
+
+        #faturasTable td {
+            padding: 14px;
+            border-bottom: 1px solid var(--gray-border);
+            font-size: 0.9rem;
+        }
+
+        #faturasTable tbody tr:hover {
+            background: var(--bg-light);
+        }
+
+        @media (max-width: 1200px) {
+            #faturasTable {
+                font-size: 0.85rem;
+            }
+            
+            #faturasTable th,
+            #faturasTable td {
+                padding: 10px 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div style="display: flex; flex-direction: column; gap: 15px; flex: 1;">
+            <div class="header-title">
+                <h1>EvaCloudd Finance </h1>
+                <p>Controle financeiro digital e integrado.</p>
+            </div>
+            <div class="relatorios-container" style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
+                <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center;">
+                    <button onclick="mostrarRelatorio(-1)" style="font-size: 0.85rem; padding: 8px 12px;">← Mês Anterior</button>
+                    <div id="mesReferencia" style="text-align: center; padding: 8px 12px; background: rgba(255,255,255,0.2); border-radius: 8px; font-weight: 600; font-size: 0.9rem; min-width: 150px;">
+                        Mês de Referência
+                    </div>
+                    <button onclick="mostrarRelatorio(1)" style="font-size: 0.85rem; padding: 8px 12px;">Próximo Mês →</button>
+                </div>
+                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                    <button onclick="mostrarRelatorio(0)" style="font-size: 0.85rem; padding: 8px 12px;">Mês Atual</button>
+                </div>
+            </div>
+        </div>
+        <div class="stats-card">
+            <div class="stat-item receita">
+                <span class="stat-label">Receitas</span>
+                <div class="stat-value" id="totalReceitas">R$ 0,00</div>
+            </div>
+            <div class="stat-item despesa">
+                <span class="stat-label">Despesas</span>
+                <div class="stat-value" id="totalDespesas">R$ 0,00</div>
+            </div>
+            <div class="stat-item saldo">
+                <span class="stat-label">Saldo do Mês</span>
+                <div class="stat-value" id="saldoMes">R$ 0,00</div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        
+        <section class="left-col">
+            <div class="card">
+                <form id="expenseForm">
+                    <div class="row">
+                        <div class="form-group">
+                            <input type="date" id="date" required>
+                        </div>
+                        <div class="form-group">
+                            <select id="type">
+                                <option value="Receita">Receita</option>
+                                <option value="Despesa">Despesa</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="form-group">
+                            <input type="text" id="category" placeholder="Categoria (ex: Alimentação)" required>
+                        </div>
+                        <div class="form-group">
+                            <input type="number" id="amount" placeholder="Valor (R$)" step="0.01" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <textarea id="obs" rows="2" placeholder="Observação (opcional)"></textarea>
+                    </div>
+
+                    <div class="btn-group">
+                        <button type="submit" class="btn-add">Adicionar</button>
+                        <button type="button" class="btn-clear" onclick="clearForm()">Limpar</button>
+                    </div>
+                    <div class="btn-group">
+                        <button type="button" class="btn-export" onclick="exportCSV()">Exportar CSV</button>
+                        <button type="button" class="btn-pdf" onclick="generatePDF()">Gerar PDF</button>
+                    </div>
+                </form>
+
+                <div class="transaction-list" id="transactionListSimple">
+                    </div>
+            </div>
+        </section>
+
+        <section class="right-col" id="reportArea">
+            <div class="card">
+                <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+                    <button onclick="gerarPDFMes(-1)" class="btn-pdf" style="font-size: 0.8rem; padding: 6px 10px;">📄 PDF Mês Anterior</button>
+                    <button onclick="gerarPDFMes(0)" class="btn-pdf" style="font-size: 0.8rem; padding: 6px 10px;">📄 PDF Mês Atual</button>
+                    <button onclick="gerarPDFMes(1)" class="btn-pdf" style="font-size: 0.8rem; padding: 6px 10px;">📄 PDF Próximo Mês</button>
+                </div>
+                <div class="charts-area">
+                    <div class="chart-box">
+                        <h4 style="margin-bottom:15px; color:var(--primary-blue);">Saldo Mensal</h4>
+                        <div class="chart-container">
+                            <canvas id="lineChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-box">
+                        <h4 style="margin-bottom:15px; color:var(--primary-blue);">Por Categoria</h4>
+                        <div class="chart-container">
+                            <canvas id="pieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="summary-table-container">
+                    <h4 style="margin-bottom:15px; color:#333; margin-top:20px;">Resumo Detalhado</h4>
+                    <table id="summaryTable">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Categoria</th>
+                                <th>Tipo</th>
+                                <th>Valor</th>
+                                <th>Obs</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção de Faturas Parceladas -->
+        <section class="full-col" style="grid-column: 1 / -1; margin-top: 25px;">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px;">
+                    <h3 style="color: var(--primary-blue); font-size: 1.3rem; font-weight: 700;">💳 Faturas Parceladas</h3>
+                    <button onclick="toggleFaturaForm()" class="btn-add" style="flex: 0 1 auto;">
+                        <i class="fas fa-plus"></i> Nova Fatura Parcelada
+                    </button>
+                </div>
+
+                <!-- Formulário de Fatura Parcelada (inicialmente oculto) -->
+                <div id="faturaFormContainer" style="display: none; background: var(--bg-light); padding: 25px; border-radius: 16px; margin-bottom: 25px;">
+                    <form id="faturaForm">
+                        <div class="row">
+                            <div class="form-group">
+                                <label>Cartão</label>
+                                <input type="text" id="faturaCartao" placeholder="Ex: Visa, Mastercard" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Banco</label>
+                                <input type="text" id="faturaBanco" placeholder="Ex: Banco do Brasil, Itaú" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="form-group">
+                                <label>Valor Total (R$)</label>
+                                <input type="number" id="faturaValorTotal" step="0.01" placeholder="0.00" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Número de Parcelas</label>
+                                <input type="number" id="faturaParcelas" min="1" max="60" placeholder="Ex: 12" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="form-group">
+                                <label>Data da Primeira Parcela</label>
+                                <input type="date" id="faturaDataInicio" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Data de Vencimento da Fatura</label>
+                                <input type="date" id="faturaDataVencimento" required>
+                                <small style="color: var(--text-light); font-size: 0.8rem; display: block; margin-top: 4px;">
+                                    Data do próximo vencimento
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="form-group">
+                                <label>Número de Parcelas Pagas</label>
+                                <input type="number" id="faturaParcelasPagas" min="0" placeholder="0" value="0" required>
+                                <small style="color: var(--text-light); font-size: 0.8rem; display: block; margin-top: 4px;">
+                                    Quantas parcelas já foram pagas?
+                                </small>
+                            </div>
+                            <div class="form-group">
+                                <label>Taxa de Juros do Banco (% ao mês)</label>
+                                <input type="number" id="faturaTaxaJuros" step="0.01" placeholder="Ex: 2.5" value="2.5" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="form-group">
+                                <label>Descrição</label>
+                                <input type="text" id="faturaDescricao" placeholder="Ex: Compra de eletrodoméstico">
+                            </div>
+                        </div>
+
+                        <div class="btn-group">
+                            <button type="submit" class="btn-add">Salvar Fatura</button>
+                            <button type="button" class="btn-clear" onclick="toggleFaturaForm()">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Filtros -->
+                <div style="background: var(--bg-light); padding: 20px; border-radius: 16px; margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 15px; color: var(--primary-blue);">🔍 Filtros</h4>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Filtrar por Cartão</label>
+                            <select id="filtroCartao" onchange="filtrarFaturas()">
+                                <option value="">Todos os cartões</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Filtrar por Banco</label>
+                            <select id="filtroBanco" onchange="filtrarFaturas()">
+                                <option value="">Todos os bancos</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Filtrar por Parcelas Restantes</label>
+                            <select id="filtroParcelas" onchange="filtrarFaturas()">
+                                <option value="">Todas</option>
+                                <option value="1-3">1 a 3 parcelas</option>
+                                <option value="4-6">4 a 6 parcelas</option>
+                                <option value="7-12">7 a 12 parcelas</option>
+                                <option value="13+">Mais de 12 parcelas</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button onclick="limparFiltros()" class="btn-clear" style="margin-top: 10px;">
+                        <i class="fas fa-times"></i> Limpar Filtros
+                    </button>
+                </div>
+
+                <!-- Tabela de Faturas -->
+                <div class="summary-table-container">
+                    <h4 style="margin-bottom:15px; color:#333;">Faturas Parceladas</h4>
+                    <table id="faturasTable">
+                        <thead>
+                            <tr>
+                                <th>Cartão</th>
+                                <th>Banco</th>
+                                <th>Valor Total</th>
+                                <th>Parcelas</th>
+                                <th>Parcelas Pagas</th>
+                                <th>Parcelas Restantes</th>
+                                <th>Valor da Parcela</th>
+                                <th>Próximo Vencimento</th>
+                                <th>Data Final</th>
+                                <th>Valor com Juros (Próximo)</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="faturasTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer>
+        <p style="text-align: center;">
+            EvaCloudd Finance • O seu ecossistema de controle financeiro
+        </p>
+    </footer>
+     <script>
+
+// ===============================
+//  VARIÁVEIS GLOBAIS
+// ===============================
+let transactions = [];
+let faturasParceladas = [];
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+
+// ===============================
+//  CARREGAR DO LOCALSTORAGE
+// ===============================
+document.addEventListener("DOMContentLoaded", () => {
+    const dados = localStorage.getItem("transactions");
+    const dadosFaturas = localStorage.getItem("faturasParceladas");
+
+    if (dados) {
+        transactions = JSON.parse(dados);
+    }
+
+    if (dadosFaturas) {
+        faturasParceladas = JSON.parse(dadosFaturas);
+    }
+
+    document.getElementById('date').valueAsDate = new Date();
+    const hoje = new Date();
+    document.getElementById('faturaDataInicio').valueAsDate = hoje;
+    const proximoMes = new Date(hoje);
+    proximoMes.setMonth(proximoMes.getMonth() + 1);
+    document.getElementById('faturaDataVencimento').valueAsDate = proximoMes;
+    initCharts();
+    updateUI(currentMonth, currentYear);
+    atualizarTabelaFaturas();
+    atualizarFiltros();
+    
+    // Adicionar event listener ao formulário
+    const form = document.getElementById("expenseForm");
+    if (form) {
+        form.addEventListener("submit", addTransaction);
+    }
+
+    // Adicionar event listener ao formulário de faturas
+    const faturaForm = document.getElementById("faturaForm");
+    if (faturaForm) {
+        faturaForm.addEventListener("submit", adicionarFaturaParcelada);
+    }
+});
+
+// ===============================
+//  SALVAR NO LOCALSTORAGE
+// ===============================
+function salvarLocal() {
+    localStorage.setItem("transactions", JSON.stringify(transactions));
+}
+
+// ===============================
+//  INICIALIZAÇÃO DOS GRÁFICOS
+// ===============================
+let lineChart, pieChart;
+
+function initCharts() {
+    const ctxLine = document.getElementById('lineChart').getContext('2d');
+    const ctxPie = document.getElementById('pieChart').getContext('2d');
+
+    let gradient = ctxLine.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(66,165,245,0.5)');
+    gradient.addColorStop(1, 'rgba(66,165,245,0.0)');
+
+    lineChart = new Chart(ctxLine, {
+        type: 'line',
+        data: {
+            labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'],
+            datasets: [{
+                label: 'Saldo',
+                data: [0, 1500, 1200, 2000],
+                borderColor: '#0d47a1',
+                backgroundColor: gradient,
+                fill: true,
+                tension: 0.4,
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    pieChart = new Chart(ctxPie, {
+        type: 'pie',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: ['#0d47a1','#42a5f5','#90caf9','#e3f2fd'], borderWidth: 2 }] },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+}
+
+// ===============================
+//  ATUALIZAR MÊS DE REFERÊNCIA
+// ===============================
+function atualizarMesReferencia(mes, ano) {
+    const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const nomeMes = meses[mes];
+    const mesReferenciaEl = document.getElementById('mesReferencia');
+    if (mesReferenciaEl) {
+        mesReferenciaEl.textContent = `${nomeMes} / ${ano}`;
+    }
+}
+
+// ===============================
+//  ATUALIZAR INTERFACE
+// ===============================
+function updateUI(filterMonth = null, filterYear = null) {
+    const listSimple = document.getElementById('transactionListSimple');
+    const tableBody = document.querySelector('#summaryTable tbody');
+    const totalReceitasEl = document.getElementById('totalReceitas');
+    const totalDespesasEl = document.getElementById('totalDespesas');
+    const saldoMesEl = document.getElementById('saldoMes');
+
+    listSimple.innerHTML = "";
+    tableBody.innerHTML = "";
+
+    // Filtrar transações se um mês/ano específico foi solicitado
+    let transacoesParaExibir = transactions;
+    if (filterMonth !== null && filterYear !== null) {
+        transacoesParaExibir = transactions.filter(t => {
+            const d = new Date(t.date);
+            return d.getMonth() === filterMonth && d.getFullYear() === filterYear;
+        });
+        // Atualizar mês de referência
+        atualizarMesReferencia(filterMonth, filterYear);
+    } else {
+        // Se não há filtro, mostrar mês atual
+        atualizarMesReferencia(currentMonth, currentYear);
+    }
+
+    let total = 0;
+    let categories = {};
+    let receitas = 0;
+    let despesas = 0;
+
+    transacoesParaExibir.forEach(t => {
+        if (t.type === "Receita") {
+            total += t.amount;
+            receitas += t.amount;
+        } else {
+            total -= t.amount;
+            despesas += t.amount;
+        }
+
+        if (!categories[t.category]) categories[t.category] = 0;
+        categories[t.category] += t.amount;
+
+        const money = t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        listSimple.innerHTML += `
+            <div class="transaction-item">
+                <div class="t-info">
+                    <h4>${t.category}</h4>
+                    <span>${t.date}</span>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <span class="t-value ${t.type === "Receita" ? "income" : "expense"}">
+                        ${t.type === "Receita" ? "+" : "-"} ${money}
+                    </span>
+                    <i class="fas fa-trash-alt" onclick="removeTransaction(${t.id})"></i>
+                </div>
+            </div>
+        `;
+
+        tableBody.innerHTML += `
+            <tr>
+                <td>${t.date}</td>
+                <td>${t.category}</td>
+                <td style="color:${t.type === "Receita" ? "#66bb6a" : "#e53935"}">${t.type}</td>
+                <td>${money}</td>
+                <td>${t.obs || ""}</td>
+            </tr>
+        `;
+    });
+
+    // Atualizar estatísticas do mês
+    if (totalReceitasEl) {
+        totalReceitasEl.innerText = receitas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+    if (totalDespesasEl) {
+        totalDespesasEl.innerText = despesas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+    if (saldoMesEl) {
+        const saldo = receitas - despesas;
+        saldoMesEl.innerText = saldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+
+    // Atualizar gráfico de pizza
+    pieChart.data.labels = Object.keys(categories);
+    pieChart.data.datasets[0].data = Object.values(categories);
+    pieChart.update();
+
+    // Atualizar gráfico de linha com dados semanais do mês
+    atualizarGraficoLinha(transacoesParaExibir, filterMonth, filterYear);
+}
+// ===============================
+//  ADICIONAR TRANSAÇÃO
+// ===============================
+function addTransaction(e) {
+    e.preventDefault();
+
+    // Capturar campos dinamicamente
+    const dateInput = document.getElementById("date");
+    const typeInput = document.getElementById("type");
+    const categoryInput = document.getElementById("category");
+    const amountInput = document.getElementById("amount");
+    const obsInput = document.getElementById("obs");
+
+    const date = dateInput.value;
+    const type = typeInput.value;
+    const category = categoryInput.value.trim();
+    const amount = parseFloat(amountInput.value);
+    const obs = obsInput.value.trim();
+
+    // Validação
+    if (!date || !category || isNaN(amount) || amount <= 0) {
+        alert("Preencha todos os campos corretamente! O valor deve ser maior que zero.");
+        return;
+    }
+
+    const nova = {
+        id: Date.now(),
+        date, 
+        type, 
+        category,
+        amount,
+        obs: obs || ""
+    };
+
+    transactions.push(nova);
+    salvarLocal();
+    
+    // Atualizar para o mês da transação adicionada
+    const dataTransacao = new Date(date);
+    currentMonth = dataTransacao.getMonth();
+    currentYear = dataTransacao.getFullYear();
+    
+    updateUI(currentMonth, currentYear);
+    clearForm();
+    
+    // Feedback visual
+    const submitBtn = document.querySelector('#expenseForm button[type="submit"]');
+    if (submitBtn) {
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = "✓ Adicionado!";
+        submitBtn.style.backgroundColor = "#66bb6a";
+        setTimeout(() => {
+            submitBtn.textContent = originalText;
+            submitBtn.style.backgroundColor = "";
+        }, 1500);
+    }
+}
+
+// ===============================
+//  REMOVER TRANSAÇÃO
+// ===============================
+function removeTransaction(id) {
+    if (!confirm("Deseja remover?")) return;
+
+    transactions = transactions.filter(t => t.id !== id);
+    salvarLocal();
+    updateUI(currentMonth, currentYear);
+}
+
+// ===============================
+//  LIMPAR FORMULÁRIO
+// ===============================
+function clearForm() {
+    const form = document.getElementById("expenseForm");
+    if (form) {
+        form.reset();
+        const dateInput = document.getElementById("date");
+        if (dateInput) {
+            dateInput.valueAsDate = new Date();
+        }
+    }
+}
+
+// ===============================
+//  CSV
+// ===============================
+function exportCSV() {
+    let csv = "Data,Categoria,Tipo,Valor,Obs\n";
+
+    transactions.forEach(t => {
+        csv += `${t.date},${t.category},${t.type},${t.amount},${t.obs}\n`;
+    });
+
+    const link = document.createElement("a");
+    link.href = "data:text/csv;charset=utf-8," + encodeURI(csv);
+    link.download = "relatorio_evacloud.csv";
+    link.click();
+}
+
+// ===============================
+//  PDF
+// ===============================
+function generatePDF() {
+    const element = document.getElementById("reportArea");
+    html2pdf().from(element).save("relatorio_financeiro.pdf");
+}
+
+// ===============================
+//  GERAR PDF POR MÊS
+// ===============================
+function gerarPDFMes(offset) {
+    const hoje = new Date();
+    hoje.setMonth(hoje.getMonth() + offset);
+    const mes = hoje.getMonth();
+    const ano = hoje.getFullYear();
+    
+    // Obter dados do mês
+    const rel = gerarRelatorioMensal(ano, mes);
+    
+    // Criar um elemento temporário para o PDF
+    const tempDiv = document.createElement('div');
+    tempDiv.style.width = '800px';
+    tempDiv.style.padding = '20px';
+    tempDiv.style.backgroundColor = 'white';
+    tempDiv.style.fontFamily = 'Poppins, sans-serif';
+    
+    // Nome do mês em português
+    const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const nomeMes = meses[mes];
+    
+    // Cabeçalho do PDF
+    tempDiv.innerHTML = `
+        <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0d47a1; padding-bottom: 15px;">
+            <h1 style="color: #0d47a1; margin: 0; font-size: 24px;">EvaCloudd Finance</h1>
+            <h2 style="color: #333; margin: 10px 0 0 0; font-size: 18px; font-weight: 500;">Relatório Financeiro - ${nomeMes}/${ano}</h2>
+        </div>
+        
+        <div style="margin-bottom: 30px; background: #f5f9ff; padding: 15px; border-radius: 10px;">
+            <h3 style="color: #0d47a1; margin: 0 0 15px 0; font-size: 16px;">Resumo do Mês</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                <div>
+                    <div style="color: #666; font-size: 12px; margin-bottom: 5px;">Receitas</div>
+                    <div style="color: #66bb6a; font-size: 20px; font-weight: 700;">${rel.receitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                </div>
+                <div>
+                    <div style="color: #666; font-size: 12px; margin-bottom: 5px;">Despesas</div>
+                    <div style="color: #e53935; font-size: 20px; font-weight: 700;">${rel.despesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                </div>
+                <div>
+                    <div style="color: #666; font-size: 12px; margin-bottom: 5px;">Saldo</div>
+                    <div style="color: ${rel.saldo >= 0 ? '#66bb6a' : '#e53935'}; font-size: 20px; font-weight: 700;">${rel.saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <h3 style="color: #0d47a1; margin: 0 0 15px 0; font-size: 16px;">Transações Detalhadas</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                <thead>
+                    <tr style="background: #0d47a1; color: white;">
+                        <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Data</th>
+                        <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Categoria</th>
+                        <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Tipo</th>
+                        <th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Valor</th>
+                        <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Observação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rel.itens.length > 0 ? rel.itens.map(t => {
+                        const money = t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                        return `
+                            <tr style="border-bottom: 1px solid #eee;">
+                                <td style="padding: 8px; border: 1px solid #ddd;">${t.date}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">${t.category}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd; color: ${t.type === "Receita" ? "#66bb6a" : "#e53935"};">${t.type}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${money}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">${t.obs || "-"}</td>
+                            </tr>
+                        `;
+                    }).join('') : `
+                        <tr>
+                            <td colspan="5" style="padding: 20px; text-align: center; color: #999; border: 1px solid #ddd;">Nenhuma transação encontrada para este mês.</td>
+                        </tr>
+                    `}
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; text-align: center; color: #999; font-size: 10px;">
+            <p>EvaCloudd Finance • O seu ecossistema de controle financeiro</p>
+            <p>Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
+        </div>
+    `;
+    
+    // Adicionar ao body temporariamente
+    document.body.appendChild(tempDiv);
+    
+    // Gerar PDF
+    const opcoes = {
+        margin: [10, 10, 10, 10],
+        filename: `relatorio_${nomeMes}_${ano}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+    html2pdf().set(opcoes).from(tempDiv).save().then(() => {
+        // Remover elemento temporário
+        document.body.removeChild(tempDiv);
+    });
+}
+
+// ===============================
+//  RELATÓRIO MENSAL
+// ===============================
+function gerarRelatorioMensal(ano, mes) {
+    const filtradas = transactions.filter(t => {
+        const d = new Date(t.date);
+        return d.getMonth() === mes && d.getFullYear() === ano;
+    });
+
+    let receitas = 0;
+    let despesas = 0;
+
+    filtradas.forEach(t => {
+        if (t.type === "Receita") receitas += t.amount;
+        else despesas += t.amount;
+    });
+
+    return {
+        ano, mes,
+        receitas, despesas,
+        saldo: receitas - despesas,
+        itens: filtradas
+    };
+}
+
+function mostrarRelatorio(offset) {
+    const hoje = new Date();
+    hoje.setMonth(hoje.getMonth() + offset);
+    
+    currentMonth = hoje.getMonth();
+    currentYear = hoje.getFullYear();
+
+    const rel = gerarRelatorioMensal(currentYear, currentMonth);
+
+    // Atualizar a UI com os dados do mês selecionado
+    updateUI(currentMonth, currentYear);
+
+    // Mostrar informações do mês no console (opcional, pode remover se não quiser)
+    console.log(
+        `📆 ${currentMonth + 1}/${currentYear}\n` +
+        `Receitas: R$ ${rel.receitas.toFixed(2)}\n` +
+        `Despesas: R$ ${rel.despesas.toFixed(2)}\n` +
+        `Saldo: R$ ${rel.saldo.toFixed(2)}`
+    );
+}
+
+// ===============================
+//  ATUALIZAR GRÁFICO DE LINHA
+// ===============================
+function atualizarGraficoLinha(transacoes, mes, ano) {
+    if (!transacoes || transacoes.length === 0) {
+        lineChart.data.datasets[0].data = [0, 0, 0, 0];
+        lineChart.update();
+        return;
+    }
+
+    // Organizar transações por semana do mês
+    const semanas = [[], [], [], []];
+    let saldoAcumulado = 0;
+
+    transacoes.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    transacoes.forEach(t => {
+        const d = new Date(t.date);
+        const dia = d.getDate();
+        const semana = Math.min(Math.floor((dia - 1) / 7), 3);
+        
+        if (t.type === "Receita") {
+            saldoAcumulado += t.amount;
+        } else {
+            saldoAcumulado -= t.amount;
+        }
+        
+        semanas[semana].push(saldoAcumulado);
+    });
+
+    // Pegar o último saldo de cada semana
+    const dadosSemanas = semanas.map(sem => sem.length > 0 ? sem[sem.length - 1] : 0);
+    
+    // Se não houver dados, usar saldo inicial de 0
+    if (dadosSemanas.every(v => v === 0)) {
+        dadosSemanas[0] = 0;
+    }
+
+    lineChart.data.datasets[0].data = dadosSemanas;
+    lineChart.update();
+}
+
+// ===============================
+//  FATURAS PARCELADAS
+// ===============================
+
+function salvarFaturasLocal() {
+    localStorage.setItem("faturasParceladas", JSON.stringify(faturasParceladas));
+}
+
+function toggleFaturaForm() {
+    const container = document.getElementById('faturaFormContainer');
+    if (container) {
+        container.style.display = container.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+function adicionarFaturaParcelada(e) {
+    e.preventDefault();
+
+    const cartao = document.getElementById('faturaCartao').value.trim();
+    const banco = document.getElementById('faturaBanco').value.trim();
+    const valorTotal = parseFloat(document.getElementById('faturaValorTotal').value);
+    const parcelas = parseInt(document.getElementById('faturaParcelas').value);
+    const dataInicio = document.getElementById('faturaDataInicio').value;
+    const dataVencimento = document.getElementById('faturaDataVencimento').value;
+    const parcelasPagas = parseInt(document.getElementById('faturaParcelasPagas').value) || 0;
+    const taxaJuros = parseFloat(document.getElementById('faturaTaxaJuros').value);
+    const descricao = document.getElementById('faturaDescricao').value.trim();
+
+    if (!cartao || !banco || isNaN(valorTotal) || valorTotal <= 0 || !parcelas || parcelas <= 0 || !dataInicio || !dataVencimento) {
+        alert("Preencha todos os campos obrigatórios corretamente!");
+        return;
+    }
+
+    if (parcelasPagas < 0 || parcelasPagas >= parcelas) {
+        alert("O número de parcelas pagas deve ser menor que o total de parcelas!");
+        return;
+    }
+
+    const valorParcela = valorTotal / parcelas;
+    const dataInicioObj = new Date(dataInicio);
+    const dataVencimentoObj = new Date(dataVencimento);
+    
+    // Calcular datas das parcelas
+    const parcelasDetalhes = [];
+    for (let i = 0; i < parcelas; i++) {
+        const dataParcela = new Date(dataInicioObj);
+        dataParcela.setMonth(dataParcela.getMonth() + i);
+        
+        // Marcar as primeiras parcelas como pagas se informado
+        const paga = i < parcelasPagas;
+        
+        parcelasDetalhes.push({
+            numero: i + 1,
+            data: dataParcela.toISOString().split('T')[0],
+            valor: valorParcela,
+            paga: paga
+        });
+    }
+
+    // Calcular data final
+    const dataFinal = new Date(dataInicioObj);
+    dataFinal.setMonth(dataFinal.getMonth() + parcelas - 1);
+
+    const novaFatura = {
+        id: Date.now(),
+        cartao,
+        banco,
+        valorTotal,
+        parcelas,
+        parcelasPagas: parcelasPagas,
+        parcelasRestantes: parcelas - parcelasPagas,
+        valorParcela,
+        dataInicio,
+        dataVencimento: dataVencimento,
+        dataFinal: dataFinal.toISOString().split('T')[0],
+        taxaJuros,
+        descricao: descricao || "",
+        parcelasDetalhes,
+        dataCriacao: new Date().toISOString()
+    };
+
+    faturasParceladas.push(novaFatura);
+    salvarFaturasLocal();
+    atualizarTabelaFaturas();
+    atualizarFiltros();
+    document.getElementById('faturaForm').reset();
+    const hoje = new Date();
+    document.getElementById('faturaDataInicio').valueAsDate = hoje;
+    const proximoMes = new Date(hoje);
+    proximoMes.setMonth(proximoMes.getMonth() + 1);
+    document.getElementById('faturaDataVencimento').valueAsDate = proximoMes;
+    document.getElementById('faturaParcelasPagas').value = 0;
+    toggleFaturaForm();
+
+    alert("Fatura parcelada adicionada com sucesso!");
+}
+
+function calcularJurosAtraso(fatura, diasAtraso = 0) {
+    if (diasAtraso <= 0) return 0;
+    
+    // Juros compostos: M = C * (1 + i)^n
+    // Onde: C = valor da parcela, i = taxa mensal, n = meses de atraso
+    const mesesAtraso = diasAtraso / 30;
+    const juros = fatura.valorParcela * (Math.pow(1 + (fatura.taxaJuros / 100), mesesAtraso) - 1);
+    
+    // Multa de 2% sobre o valor da parcela
+    const multa = fatura.valorParcela * 0.02;
+    
+    return juros + multa;
+}
+
+function calcularProximoValor(fatura) {
+    const hoje = new Date();
+    const proximaParcela = fatura.parcelasDetalhes.find(p => !p.paga);
+    
+    if (!proximaParcela) return { valor: 0, diasAtraso: 0, juros: 0 };
+
+    // Usar a data de vencimento informada ou a data da próxima parcela
+    const dataVencimento = fatura.dataVencimento ? new Date(fatura.dataVencimento) : new Date(proximaParcela.data);
+    const diasAtraso = Math.max(0, Math.floor((hoje - dataVencimento) / (1000 * 60 * 60 * 24)));
+    
+    const juros = calcularJurosAtraso(fatura, diasAtraso);
+    const valorTotal = proximaParcela.valor + juros;
+
+    return {
+        valor: valorTotal,
+        diasAtraso,
+        juros,
+        dataVencimento: fatura.dataVencimento || proximaParcela.data,
+        numeroParcela: proximaParcela.numero
+    };
+}
+
+function calcularParcelasRestantes(fatura) {
+    const parcelasPagas = fatura.parcelasDetalhes.filter(p => p.paga).length;
+    fatura.parcelasPagas = parcelasPagas;
+    fatura.parcelasRestantes = fatura.parcelas - parcelasPagas;
+    return fatura.parcelasRestantes;
+}
+
+function atualizarTabelaFaturas() {
+    const tbody = document.getElementById('faturasTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (faturasParceladas.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="11" style="text-align: center; padding: 40px; color: var(--text-light);">
+                    Nenhuma fatura parcelada cadastrada.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    faturasParceladas.forEach(fatura => {
+        // Atualizar parcelas restantes automaticamente
+        calcularParcelasRestantes(fatura);
+        
+        const proximoValor = calcularProximoValor(fatura);
+        const valorFormatado = fatura.valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const parcelaFormatada = fatura.valorParcela.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const proximoValorFormatado = proximoValor.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        
+        // Usar a data de vencimento informada ou calcular da próxima parcela
+        const dataVencimento = fatura.dataVencimento ? 
+            new Date(fatura.dataVencimento).toLocaleDateString('pt-BR') : 
+            (proximoValor.dataVencimento ? new Date(proximoValor.dataVencimento).toLocaleDateString('pt-BR') : '-');
+        const dataFinal = fatura.dataFinal ? new Date(fatura.dataFinal).toLocaleDateString('pt-BR') : '-';
+        
+        let statusClass = '';
+        let statusText = '';
+        if (proximoValor.diasAtraso > 0) {
+            statusClass = 'expense';
+            statusText = `⚠️ ${proximoValor.diasAtraso} dias atrasado`;
+        } else {
+            statusClass = 'income';
+            statusText = '✓ Em dia';
+        }
+
+        tbody.innerHTML += `
+            <tr data-fatura-id="${fatura.id}" data-cartao="${fatura.cartao}" data-banco="${fatura.banco}" data-parcelas="${fatura.parcelasRestantes}">
+                <td>${fatura.cartao}</td>
+                <td>${fatura.banco}</td>
+                <td style="font-weight: 600;">${valorFormatado}</td>
+                <td>${fatura.parcelas}x</td>
+                <td style="color: var(--accent-green); font-weight: 600;">${fatura.parcelasPagas}</td>
+                <td><strong style="color: var(--accent-red);">${fatura.parcelasRestantes}</strong></td>
+                <td>${parcelaFormatada}</td>
+                <td>${dataVencimento}</td>
+                <td style="font-weight: 600;">${dataFinal}</td>
+                <td style="font-weight: 700; color: ${proximoValor.diasAtraso > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">
+                    ${proximoValorFormatado}
+                    ${proximoValor.juros > 0 ? `<br><small style="color: var(--accent-red);">(+ ${proximoValor.juros.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} juros)</small>` : ''}
+                </td>
+                <td>
+                    <button onclick="abrirModalParcelas(${fatura.id})" class="btn-add" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
+                        <i class="fas fa-edit"></i> Parcelas
+                    </button>
+                    <button onclick="marcarParcelaPaga(${fatura.id})" class="btn-add" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
+                        <i class="fas fa-check"></i> Pagar
+                    </button>
+                    <button onclick="removerFatura(${fatura.id})" class="btn-clear" style="padding: 6px 12px; font-size: 0.85rem;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+function atualizarFiltros() {
+    const filtroCartao = document.getElementById('filtroCartao');
+    const filtroBanco = document.getElementById('filtroBanco');
+
+    if (!filtroCartao || !filtroBanco) return;
+
+    // Obter valores únicos
+    const cartoes = [...new Set(faturasParceladas.map(f => f.cartao))];
+    const bancos = [...new Set(faturasParceladas.map(f => f.banco))];
+
+    // Limpar e preencher filtro de cartões
+    filtroCartao.innerHTML = '<option value="">Todos os cartões</option>';
+    cartoes.forEach(cartao => {
+        filtroCartao.innerHTML += `<option value="${cartao}">${cartao}</option>`;
+    });
+
+    // Limpar e preencher filtro de bancos
+    filtroBanco.innerHTML = '<option value="">Todos os bancos</option>';
+    bancos.forEach(banco => {
+        filtroBanco.innerHTML += `<option value="${banco}">${banco}</option>`;
+    });
+}
+
+function filtrarFaturas() {
+    const filtroCartao = document.getElementById('filtroCartao').value;
+    const filtroBanco = document.getElementById('filtroBanco').value;
+    const filtroParcelas = document.getElementById('filtroParcelas').value;
+
+    const linhas = document.querySelectorAll('#faturasTableBody tr[data-fatura-id]');
+    
+    linhas.forEach(linha => {
+        const cartao = linha.getAttribute('data-cartao');
+        const banco = linha.getAttribute('data-banco');
+        const parcelas = parseInt(linha.getAttribute('data-parcelas'));
+
+        let mostrar = true;
+
+        if (filtroCartao && cartao !== filtroCartao) mostrar = false;
+        if (filtroBanco && banco !== filtroBanco) mostrar = false;
+        
+        if (filtroParcelas) {
+            if (filtroParcelas === '1-3' && (parcelas < 1 || parcelas > 3)) mostrar = false;
+            else if (filtroParcelas === '4-6' && (parcelas < 4 || parcelas > 6)) mostrar = false;
+            else if (filtroParcelas === '7-12' && (parcelas < 7 || parcelas > 12)) mostrar = false;
+            else if (filtroParcelas === '13+' && parcelas < 13) mostrar = false;
+        }
+
+        linha.style.display = mostrar ? '' : 'none';
+    });
+}
+
+function limparFiltros() {
+    document.getElementById('filtroCartao').value = '';
+    document.getElementById('filtroBanco').value = '';
+    document.getElementById('filtroParcelas').value = '';
+    filtrarFaturas();
+}
+
+function marcarParcelaPaga(faturaId) {
+    const fatura = faturasParceladas.find(f => f.id === faturaId);
+    if (!fatura) return;
+
+    const proximaParcela = fatura.parcelasDetalhes.find(p => !p.paga);
+    if (!proximaParcela) {
+        alert("Todas as parcelas já foram pagas!");
+        return;
+    }
+
+    if (!confirm(`Confirmar pagamento da parcela ${proximaParcela.numero}/${fatura.parcelas}?`)) return;
+
+    proximaParcela.paga = true;
+    calcularParcelasRestantes(fatura);
+
+    salvarFaturasLocal();
+    atualizarTabelaFaturas();
+    atualizarFiltros();
+}
+
+function abrirModalParcelas(faturaId) {
+    const fatura = faturasParceladas.find(f => f.id === faturaId);
+    if (!fatura) return;
+
+    let modalHTML = `
+        <div id="modalParcelas" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 20px; padding: 30px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="color: var(--primary-blue); margin: 0;">Parcelas - ${fatura.cartao} / ${fatura.banco}</h3>
+                    <button onclick="fecharModalParcelas()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-medium);">&times;</button>
+                </div>
+                <p style="margin-bottom: 20px; color: var(--text-medium);">
+                    <strong>Valor Total:</strong> ${fatura.valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} | 
+                    <strong>Parcelas:</strong> ${fatura.parcelas}x | 
+                    <strong>Valor da Parcela:</strong> ${fatura.valorParcela.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </p>
+                <div style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: var(--bg-light);">
+                                <th style="padding: 10px; text-align: left; border-bottom: 2px solid var(--gray-border);">Parcela</th>
+                                <th style="padding: 10px; text-align: left; border-bottom: 2px solid var(--gray-border);">Vencimento</th>
+                                <th style="padding: 10px; text-align: right; border-bottom: 2px solid var(--gray-border);">Valor</th>
+                                <th style="padding: 10px; text-align: center; border-bottom: 2px solid var(--gray-border);">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+    `;
+
+    fatura.parcelasDetalhes.forEach(parcela => {
+        const dataVenc = new Date(parcela.data).toLocaleDateString('pt-BR');
+        const valorFormatado = parcela.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const status = parcela.paga ? 
+            '<span style="color: var(--accent-green); font-weight: 600;">✓ Paga</span>' : 
+            '<span style="color: var(--accent-red);">Pendente</span>';
+        
+        modalHTML += `
+            <tr style="border-bottom: 1px solid var(--gray-border);">
+                <td style="padding: 10px;">${parcela.numero}/${fatura.parcelas}</td>
+                <td style="padding: 10px;">${dataVenc}</td>
+                <td style="padding: 10px; text-align: right; font-weight: 600;">${valorFormatado}</td>
+                <td style="padding: 10px; text-align: center;">
+                    ${status}
+                    ${!parcela.paga ? `<button onclick="marcarParcelaEspecifica(${fatura.id}, ${parcela.numero})" class="btn-add" style="padding: 4px 8px; font-size: 0.75rem; margin-left: 10px;">
+                        <i class="fas fa-check"></i> Marcar Paga
+                    </button>` : ''}
+                </td>
+            </tr>
+        `;
+    });
+
+    modalHTML += `
+                        </tbody>
+                    </table>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="fecharModalParcelas()" class="btn-clear">Fechar</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+function fecharModalParcelas() {
+    const modal = document.getElementById('modalParcelas');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function marcarParcelaEspecifica(faturaId, numeroParcela) {
+    const fatura = faturasParceladas.find(f => f.id === faturaId);
+    if (!fatura) return;
+
+    const parcela = fatura.parcelasDetalhes.find(p => p.numero === numeroParcela);
+    if (!parcela) return;
+
+    if (parcela.paga) {
+        alert("Esta parcela já foi marcada como paga!");
+        return;
+    }
+
+    if (!confirm(`Confirmar pagamento da parcela ${numeroParcela}/${fatura.parcelas}?`)) return;
+
+    parcela.paga = true;
+    calcularParcelasRestantes(fatura);
+
+    salvarFaturasLocal();
+    fecharModalParcelas();
+    atualizarTabelaFaturas();
+    atualizarFiltros();
+}
+
+function removerFatura(faturaId) {
+    if (!confirm("Deseja remover esta fatura parcelada?")) return;
+
+    faturasParceladas = faturasParceladas.filter(f => f.id !== faturaId);
+    salvarFaturasLocal();
+    atualizarTabelaFaturas();
+    atualizarFiltros();
+}
+
+</script>
+</body>
+</html>
