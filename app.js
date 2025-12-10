@@ -4,6 +4,7 @@
 let transactions = [];
 let faturasParceladas = [];
 let despesasRecorrentes = [];
+let receitasRecorrentes = [];
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
 
@@ -20,6 +21,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (dadosFaturas) {
         faturasParceladas = JSON.parse(dadosFaturas);
+        // Garantir que faturas antigas tenham o campo ativa
+        faturasParceladas.forEach(fatura => {
+            if (fatura.ativa === undefined) {
+                fatura.ativa = true;
+            }
+        });
+        if (faturasParceladas.length > 0) {
+            salvarFaturasLocal();
+        }
     }
 
     const dadosDespesasRecorrentes = localStorage.getItem("despesasRecorrentes");
@@ -27,16 +37,21 @@ document.addEventListener("DOMContentLoaded", () => {
         despesasRecorrentes = JSON.parse(dadosDespesasRecorrentes);
     }
 
+    const dadosReceitasRecorrentes = localStorage.getItem("receitasRecorrentes");
+    if (dadosReceitasRecorrentes) {
+        receitasRecorrentes = JSON.parse(dadosReceitasRecorrentes);
+    }
+
     document.getElementById('date').valueAsDate = new Date();
     const hoje = new Date();
     document.getElementById('faturaDataInicio').valueAsDate = hoje;
-    const proximoMes = new Date(hoje);
-    proximoMes.setMonth(proximoMes.getMonth() + 1);
-    document.getElementById('faturaDataVencimento').valueAsDate = proximoMes;
+    // Dia de pagamento padrão: dia 10
+    document.getElementById('faturaDiaPagamento').value = 10;
     initCharts();
     
-    // Gerar transações automáticas de despesas recorrentes e despesas cartões
+    // Gerar transações automáticas de despesas recorrentes, receitas recorrentes e despesas cartões
     gerarTransacoesRecorrentes();
+    gerarTransacoesReceitasRecorrentes();
     gerarTransacoesFaturasParceladas();
     
     updateUI(currentMonth, currentYear);
@@ -62,17 +77,13 @@ document.addEventListener("DOMContentLoaded", () => {
         despesaRecorrenteForm.addEventListener("submit", adicionarDespesaRecorrente);
     }
 
-    // Adicionar event listeners para calcular automaticamente a última parcela
-    const faturaDataInicio = document.getElementById('faturaDataInicio');
-    const faturaParcelas = document.getElementById('faturaParcelas');
-    
-    if (faturaDataInicio) {
-        faturaDataInicio.addEventListener('change', calcularUltimaParcelaAuto);
+    // Adicionar event listener ao formulário de receitas recorrentes
+    const receitaRecorrenteForm = document.getElementById("receitaRecorrenteForm");
+    if (receitaRecorrenteForm) {
+        receitaRecorrenteForm.addEventListener("submit", adicionarReceitaRecorrente);
     }
-    if (faturaParcelas) {
-        faturaParcelas.addEventListener('change', calcularUltimaParcelaAuto);
-        faturaParcelas.addEventListener('input', calcularUltimaParcelaAuto);
-    }
+
+    // Event listeners removidos - não são mais necessários
 
     // Carregar preferência de modo escuro
     carregarModoEscuro();
@@ -782,45 +793,7 @@ function toggleFaturaForm() {
     }
 }
 
-// Preenche automaticamente a data de vencimento final com base na 1ª parcela e no total
-function preencherUltimaParcela() {
-    const inicioEl = document.getElementById('faturaDataInicio');
-    const parcelasEl = document.getElementById('faturaParcelas');
-    const vencimentoEl = document.getElementById('faturaDataVencimento');
-
-    if (!inicioEl || !parcelasEl || !vencimentoEl) return;
-
-    const inicio = inicioEl.value;
-    const parcelas = parseInt(parcelasEl.value);
-
-    if (!inicio || !parcelas || parcelas <= 0) {
-        alert("Informe a data da primeira parcela e o número total de parcelas.");
-        return;
-    }
-
-    const dataFinal = new Date(inicio);
-    dataFinal.setMonth(dataFinal.getMonth() + (parcelas - 1));
-    vencimentoEl.valueAsDate = dataFinal;
-}
-
-// Calcula automaticamente a última parcela quando os campos mudam
-function calcularUltimaParcelaAuto() {
-    const inicioEl = document.getElementById('faturaDataInicio');
-    const parcelasEl = document.getElementById('faturaParcelas');
-    const vencimentoEl = document.getElementById('faturaDataVencimento');
-
-    if (!inicioEl || !parcelasEl || !vencimentoEl) return;
-
-    const inicio = inicioEl.value;
-    const parcelas = parseInt(parcelasEl.value);
-
-    // Só calcula se ambos os campos estiverem preenchidos
-    if (inicio && parcelas && parcelas > 0) {
-        const dataFinal = new Date(inicio);
-        dataFinal.setMonth(dataFinal.getMonth() + (parcelas - 1));
-        vencimentoEl.valueAsDate = dataFinal;
-    }
-}
+// Funções removidas - não são mais necessárias com dia de pagamento
 
 function adicionarFaturaParcelada(e) {
     e.preventDefault();
@@ -830,13 +803,13 @@ function adicionarFaturaParcelada(e) {
     const valorTotal = parseFloat(document.getElementById('faturaValorTotal').value);
     const parcelas = parseInt(document.getElementById('faturaParcelas').value);
     const dataInicio = document.getElementById('faturaDataInicio').value;
-    const dataVencimento = document.getElementById('faturaDataVencimento').value;
+    const diaPagamento = parseInt(document.getElementById('faturaDiaPagamento').value);
     const parcelasPagas = parseInt(document.getElementById('faturaParcelasPagas').value) || 0;
     const taxaJuros = parseFloat(document.getElementById('faturaTaxaJuros').value);
     const descricao = document.getElementById('faturaDescricao').value.trim();
 
-    if (!cartao || !banco || isNaN(valorTotal) || valorTotal <= 0 || !parcelas || parcelas <= 0 || !dataInicio || !dataVencimento) {
-        alert("Preencha todos os campos obrigatórios corretamente!");
+    if (!cartao || !banco || isNaN(valorTotal) || valorTotal <= 0 || !parcelas || parcelas <= 0 || !dataInicio || !diaPagamento || diaPagamento < 1 || diaPagamento > 31) {
+        alert("Preencha todos os campos obrigatórios corretamente! O dia de pagamento deve ser entre 1 e 31.");
         return;
     }
 
@@ -847,13 +820,18 @@ function adicionarFaturaParcelada(e) {
 
     const valorParcela = valorTotal / parcelas;
     const dataInicioObj = new Date(dataInicio);
-    const dataVencimentoObj = new Date(dataVencimento);
     
-    // Calcular datas das parcelas
+    // Calcular datas das parcelas baseadas no dia de pagamento
     const parcelasDetalhes = [];
     for (let i = 0; i < parcelas; i++) {
+        // Calcular data da parcela baseada no dia de pagamento
         const dataParcela = new Date(dataInicioObj);
         dataParcela.setMonth(dataParcela.getMonth() + i);
+        
+        // Ajustar para o dia de pagamento do cartão
+        const ultimoDiaDoMes = new Date(dataParcela.getFullYear(), dataParcela.getMonth() + 1, 0).getDate();
+        const diaFinal = Math.min(diaPagamento, ultimoDiaDoMes);
+        dataParcela.setDate(diaFinal);
         
         // Marcar as primeiras parcelas como pagas se informado
         const paga = i < parcelasPagas;
@@ -866,9 +844,12 @@ function adicionarFaturaParcelada(e) {
         });
     }
 
-    // Calcular data final
+    // Calcular data final baseada no dia de pagamento
     const dataFinal = new Date(dataInicioObj);
     dataFinal.setMonth(dataFinal.getMonth() + parcelas - 1);
+    const ultimoDiaDoMesFinal = new Date(dataFinal.getFullYear(), dataFinal.getMonth() + 1, 0).getDate();
+    const diaFinal = Math.min(diaPagamento, ultimoDiaDoMesFinal);
+    dataFinal.setDate(diaFinal);
 
     const novaFatura = {
         id: Date.now(),
@@ -880,11 +861,12 @@ function adicionarFaturaParcelada(e) {
         parcelasRestantes: parcelas - parcelasPagas,
         valorParcela,
         dataInicio,
-        dataVencimento: dataVencimento,
+        diaPagamento: diaPagamento,
         dataFinal: dataFinal.toISOString().split('T')[0],
         taxaJuros,
         descricao: descricao || "",
         parcelasDetalhes,
+        ativa: true,
         dataCriacao: new Date().toISOString()
     };
 
@@ -900,9 +882,7 @@ function adicionarFaturaParcelada(e) {
     document.getElementById('faturaForm').reset();
     const hoje = new Date();
     document.getElementById('faturaDataInicio').valueAsDate = hoje;
-    const proximoMes = new Date(hoje);
-    proximoMes.setMonth(proximoMes.getMonth() + 1);
-    document.getElementById('faturaDataVencimento').valueAsDate = proximoMes;
+    document.getElementById('faturaDiaPagamento').value = 10;
     document.getElementById('faturaParcelasPagas').value = 0;
     toggleFaturaForm();
 
@@ -929,8 +909,26 @@ function calcularProximoValor(fatura) {
     
     if (!proximaParcela) return { valor: 0, diasAtraso: 0, juros: 0 };
 
-    // Usar a data de vencimento informada ou a data da próxima parcela
-    const dataVencimento = fatura.dataVencimento ? new Date(fatura.dataVencimento) : new Date(proximaParcela.data);
+    // Calcular data de vencimento baseada no dia de pagamento do cartão
+    let dataVencimento = new Date(proximaParcela.data);
+    
+    // Se a fatura tem dia de pagamento, calcular o próximo vencimento baseado nele
+    if (fatura.diaPagamento) {
+        const mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+        const ultimoDiaDoMes = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 0).getDate();
+        const diaFinal = Math.min(fatura.diaPagamento, ultimoDiaDoMes);
+        
+        // Se já passou o dia de pagamento deste mês, usar o próximo mês
+        if (hoje.getDate() > fatura.diaPagamento) {
+            mesAtual.setMonth(mesAtual.getMonth() + 1);
+            const ultimoDiaProximoMes = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 0).getDate();
+            const diaFinalProximo = Math.min(fatura.diaPagamento, ultimoDiaProximoMes);
+            dataVencimento = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), diaFinalProximo);
+        } else {
+            dataVencimento = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), diaFinal);
+        }
+    }
+    
     const diasAtraso = Math.max(0, Math.floor((hoje - dataVencimento) / (1000 * 60 * 60 * 24)));
     
     const juros = calcularJurosAtraso(fatura, diasAtraso);
@@ -940,7 +938,7 @@ function calcularProximoValor(fatura) {
         valor: valorTotal,
         diasAtraso,
         juros,
-        dataVencimento: fatura.dataVencimento || proximaParcela.data,
+        dataVencimento: dataVencimento.toISOString().split('T')[0],
         numeroParcela: proximaParcela.numero
     };
 }
@@ -978,10 +976,6 @@ function atualizarTabelaFaturas() {
         const parcelaFormatada = fatura.valorParcela.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const proximoValorFormatado = proximoValor.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         
-        // Usar a data de vencimento informada ou calcular da próxima parcela
-        const dataVencimento = fatura.dataVencimento ? 
-            new Date(fatura.dataVencimento).toLocaleDateString('pt-BR') : 
-            (proximoValor.dataVencimento ? new Date(proximoValor.dataVencimento).toLocaleDateString('pt-BR') : '-');
         const dataFinal = fatura.dataFinal ? new Date(fatura.dataFinal).toLocaleDateString('pt-BR') : '-';
         
         let statusClass = '';
@@ -994,8 +988,15 @@ function atualizarTabelaFaturas() {
             statusText = '✓ Em dia';
         }
 
+        const dataVencimentoFormatada = proximoValor.dataVencimento ? 
+            new Date(proximoValor.dataVencimento).toLocaleDateString('pt-BR') : '-';
+        
+        // Status da fatura (ativo/inativo)
+        const statusFatura = fatura.ativa !== false ? 'Ativa' : 'Inativa';
+        const statusFaturaClass = fatura.ativa !== false ? 'accent-green' : 'accent-red';
+        
         tbody.innerHTML += `
-            <tr data-fatura-id="${fatura.id}" data-cartao="${fatura.cartao}" data-banco="${fatura.banco}" data-parcelas="${fatura.parcelasRestantes}">
+            <tr data-fatura-id="${fatura.id}" data-cartao="${fatura.cartao}" data-banco="${fatura.banco}" data-parcelas="${fatura.parcelasRestantes}" style="opacity: ${fatura.ativa !== false ? '1' : '0.6'};">
                 <td>${fatura.cartao}</td>
                 <td>${fatura.banco}</td>
                 <td style="font-weight: 600;">${valorFormatado}</td>
@@ -1003,18 +1004,25 @@ function atualizarTabelaFaturas() {
                 <td style="color: var(--accent-green); font-weight: 600;">${fatura.parcelasPagas}</td>
                 <td><strong style="color: var(--accent-red);">${fatura.parcelasRestantes}</strong></td>
                 <td>${parcelaFormatada}</td>
-                <td>${dataVencimento}</td>
                 <td style="font-weight: 600;">${dataFinal}</td>
                 <td style="font-weight: 700; color: ${proximoValor.diasAtraso > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">
                     ${proximoValorFormatado}
                     ${proximoValor.juros > 0 ? `<br><small style="color: var(--accent-red);">(+ ${proximoValor.juros.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} juros)</small>` : ''}
+                    ${proximoValor.dataVencimento ? `<br><small style="color: var(--text-medium); font-size: 0.75rem;">Venc: ${dataVencimentoFormatada}</small>` : ''}
                 </td>
+                <td style="color: var(--${statusFaturaClass}); font-weight: 600;">${statusFatura}</td>
                 <td>
+                    <button onclick="abrirModalEditarFatura(${fatura.id})" class="btn-export" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
                     <button onclick="abrirModalParcelas(${fatura.id})" class="btn-add" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
-                        <i class="fas fa-edit"></i> Parcelas
+                        <i class="fas fa-list"></i> Parcelas
                     </button>
                     <button onclick="marcarParcelaPaga(${fatura.id})" class="btn-add" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
                         <i class="fas fa-check"></i> Pagar
+                    </button>
+                    <button onclick="alternarStatusFatura(${fatura.id})" class="btn-export" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
+                        <i class="fas fa-${fatura.ativa !== false ? 'pause' : 'play'}"></i> ${fatura.ativa !== false ? 'Desativar' : 'Ativar'}
                     </button>
                     <button onclick="removerFatura(${fatura.id})" class="btn-clear" style="padding: 6px 12px; font-size: 0.85rem;">
                         <i class="fas fa-trash"></i>
@@ -1224,13 +1232,230 @@ function marcarParcelaEspecifica(faturaId, numeroParcela) {
     updateUI(currentMonth, currentYear);
 }
 
-function removerFatura(faturaId) {
-    if (!confirm("Deseja remover esta despesa cartão?")) return;
+function abrirModalEditarFatura(faturaId) {
+    const fatura = faturasParceladas.find(f => f.id === faturaId);
+    if (!fatura) return;
 
-    faturasParceladas = faturasParceladas.filter(f => f.id !== faturaId);
+    const dataInicio = new Date(fatura.dataInicio).toISOString().split('T')[0];
+
+    let modalHTML = `
+        <div id="modalEditarFatura" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 20px; padding: 30px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="color: var(--primary-blue); margin: 0;">Editar Despesa Cartão</h3>
+                    <button onclick="fecharModalEditarFatura()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-medium);">&times;</button>
+                </div>
+                <form id="formEditarFatura" onsubmit="salvarEdicaoFatura(event, ${faturaId})">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Cartão</label>
+                            <input type="text" id="editFaturaCartao" value="${fatura.cartao}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Banco</label>
+                            <input type="text" id="editFaturaBanco" value="${fatura.banco}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Valor Total (R$)</label>
+                            <input type="number" id="editFaturaValorTotal" step="0.01" value="${fatura.valorTotal}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Número de Parcelas</label>
+                            <input type="number" id="editFaturaParcelas" min="1" max="60" value="${fatura.parcelas}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Data da Primeira Parcela</label>
+                            <input type="date" id="editFaturaDataInicio" value="${dataInicio}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Dia de Pagamento do Cartão</label>
+                            <input type="number" id="editFaturaDiaPagamento" min="1" max="31" value="${fatura.diaPagamento}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Taxa de Juros (% ao mês)</label>
+                            <input type="number" id="editFaturaTaxaJuros" step="0.01" value="${fatura.taxaJuros}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Descrição</label>
+                            <input type="text" id="editFaturaDescricao" value="${fatura.descricao || ''}" style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                    </div>
+                    <small style="color: var(--text-light); font-size: 0.8rem; display: block; margin-bottom: 20px;">
+                        ⚠️ Atenção: Ao editar, as parcelas serão recalculadas. Parcelas já pagas serão mantidas.
+                    </small>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" onclick="fecharModalEditarFatura()" class="btn-clear">Cancelar</button>
+                        <button type="submit" class="btn-add">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+function fecharModalEditarFatura() {
+    const modal = document.getElementById('modalEditarFatura');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function salvarEdicaoFatura(e, faturaId) {
+    e.preventDefault();
+
+    const fatura = faturasParceladas.find(f => f.id === faturaId);
+    if (!fatura) return;
+
+    const novoCartao = document.getElementById('editFaturaCartao').value.trim();
+    const novoBanco = document.getElementById('editFaturaBanco').value.trim();
+    const novoValorTotal = parseFloat(document.getElementById('editFaturaValorTotal').value);
+    const novasParcelas = parseInt(document.getElementById('editFaturaParcelas').value);
+    const novaDataInicio = document.getElementById('editFaturaDataInicio').value;
+    const novoDiaPagamento = parseInt(document.getElementById('editFaturaDiaPagamento').value);
+    const novaTaxaJuros = parseFloat(document.getElementById('editFaturaTaxaJuros').value);
+    const novaDescricao = document.getElementById('editFaturaDescricao').value.trim();
+
+    if (!novoCartao || !novoBanco || isNaN(novoValorTotal) || novoValorTotal <= 0 || !novasParcelas || novasParcelas <= 0 || !novaDataInicio || !novoDiaPagamento || novoDiaPagamento < 1 || novoDiaPagamento > 31) {
+        alert("Preencha todos os campos obrigatórios corretamente!");
+        return;
+    }
+
+    // Manter o número de parcelas pagas (não pode ser maior que o total)
+    const parcelasPagas = Math.min(fatura.parcelasPagas, novasParcelas);
+
+    // Remover transações futuras relacionadas para regenerar com novos dados
+    const hoje = new Date();
+    transactions = transactions.filter(t => {
+        if (t.faturaId === faturaId) {
+            const dataTransacao = new Date(t.date);
+            return dataTransacao < hoje;
+        }
+        return true;
+    });
+
+    // Recalcular valor da parcela
+    const novoValorParcela = novoValorTotal / novasParcelas;
+    const dataInicioObj = new Date(novaDataInicio);
+    
+    // Recalcular datas das parcelas baseadas no dia de pagamento
+    const parcelasDetalhes = [];
+    for (let i = 0; i < novasParcelas; i++) {
+        // Calcular data da parcela baseada no dia de pagamento
+        const dataParcela = new Date(dataInicioObj);
+        dataParcela.setMonth(dataParcela.getMonth() + i);
+        
+        // Ajustar para o dia de pagamento do cartão
+        const ultimoDiaDoMes = new Date(dataParcela.getFullYear(), dataParcela.getMonth() + 1, 0).getDate();
+        const diaFinal = Math.min(novoDiaPagamento, ultimoDiaDoMes);
+        dataParcela.setDate(diaFinal);
+        
+        // Manter status de pagamento das parcelas antigas (se existirem)
+        let paga = false;
+        if (i < fatura.parcelasDetalhes.length) {
+            paga = fatura.parcelasDetalhes[i].paga;
+        } else if (i < parcelasPagas) {
+            paga = true;
+        }
+        
+        parcelasDetalhes.push({
+            numero: i + 1,
+            data: dataParcela.toISOString().split('T')[0],
+            valor: novoValorParcela,
+            paga: paga
+        });
+    }
+
+    // Calcular data final baseada no dia de pagamento
+    const dataFinal = new Date(dataInicioObj);
+    dataFinal.setMonth(dataFinal.getMonth() + novasParcelas - 1);
+    const ultimoDiaDoMesFinal = new Date(dataFinal.getFullYear(), dataFinal.getMonth() + 1, 0).getDate();
+    const diaFinal = Math.min(novoDiaPagamento, ultimoDiaDoMesFinal);
+    dataFinal.setDate(diaFinal);
+
+    // Atualizar dados da fatura
+    fatura.cartao = novoCartao;
+    fatura.banco = novoBanco;
+    fatura.valorTotal = novoValorTotal;
+    fatura.parcelas = novasParcelas;
+    fatura.parcelasPagas = parcelasPagas;
+    fatura.parcelasRestantes = novasParcelas - parcelasPagas;
+    fatura.valorParcela = novoValorParcela;
+    fatura.dataInicio = novaDataInicio;
+    fatura.diaPagamento = novoDiaPagamento;
+    fatura.dataFinal = dataFinal.toISOString().split('T')[0];
+    fatura.taxaJuros = novaTaxaJuros;
+    fatura.descricao = novaDescricao || "";
+    fatura.parcelasDetalhes = parcelasDetalhes;
+
+    salvarFaturasLocal();
+    
+    // Regenerar transações com os novos dados
+    if (fatura.ativa !== false) {
+        gerarTransacoesFaturasParceladas();
+    }
+    
+    salvarLocal();
+    fecharModalEditarFatura();
+    atualizarTabelaFaturas();
+    atualizarFiltros();
+    updateUI(currentMonth, currentYear);
+
+    alert("Despesa cartão atualizada com sucesso!");
+}
+
+function alternarStatusFatura(faturaId) {
+    const fatura = faturasParceladas.find(f => f.id === faturaId);
+    if (!fatura) return;
+
+    fatura.ativa = fatura.ativa === false ? true : false;
+    
+    // Se estiver desativando, remover transações futuras
+    if (!fatura.ativa) {
+        const hoje = new Date();
+        transactions = transactions.filter(t => {
+            if (t.faturaId === faturaId) {
+                const dataTransacao = new Date(t.date);
+                return dataTransacao < hoje;
+            }
+            return true;
+        });
+        salvarLocal();
+    } else {
+        // Se estiver ativando, gerar transações futuras
+        gerarTransacoesFaturasParceladas();
+    }
+    
     salvarFaturasLocal();
     atualizarTabelaFaturas();
     atualizarFiltros();
+    updateUI(currentMonth, currentYear);
+}
+
+function removerFatura(faturaId) {
+    if (!confirm("Deseja remover esta despesa cartão?")) return;
+
+    // Remover todas as transações relacionadas a esta fatura
+    transactions = transactions.filter(t => t.faturaId !== faturaId);
+    
+    // Remover a fatura
+    faturasParceladas = faturasParceladas.filter(f => f.id !== faturaId);
+    
+    // Salvar alterações
+    salvarFaturasLocal();
+    salvarLocal();
+    
+    // Atualizar interface
+    atualizarTabelaFaturas();
+    atualizarFiltros();
+    updateUI(currentMonth, currentYear);
 }
 
 // ===============================
@@ -1429,61 +1654,9 @@ function gerarTransacoesFaturasParceladas() {
         const mesAlvo = dataAlvo.getMonth();
         
         faturasParceladas.forEach(fatura => {
-            // Processar apenas parcelas não pagas
-            fatura.parcelasDetalhes.forEach(parcela => {
-                if (parcela.paga) return;
-                
-                const dataParcela = new Date(parcela.data);
-                const anoParcela = dataParcela.getFullYear();
-                const mesParcela = dataParcela.getMonth();
-                
-                // Verificar se a parcela está no mês alvo
-                if (anoParcela !== anoAlvo || mesParcela !== mesAlvo) {
-                    return;
-                }
-                
-                // Verificar se já existe uma transação para esta parcela
-                const transacaoExistente = transactions.find(t => 
-                    t.faturaId === fatura.id && 
-                    t.parcelaNumero === parcela.numero
-                );
-                
-                if (!transacaoExistente) {
-                    const novaTransacao = {
-                        id: Date.now() + Math.random(),
-                        date: parcela.data,
-                        type: "Despesa",
-                        category: `Fatura ${fatura.cartao} - ${fatura.banco}`,
-                        amount: parcela.valor,
-                        obs: `[Despesa Cartão] ${fatura.descricao || `${fatura.cartao} / ${fatura.banco}`} - Parcela ${parcela.numero}/${fatura.parcelas}`,
-                        faturaId: fatura.id,
-                        parcelaNumero: parcela.numero
-                    };
-                    
-                    transactions.push(novaTransacao);
-                }
-            });
-        });
-    }
-    
-    salvarLocal();
-}
-
-// ===============================
-//  GERAR TRANSAÇÕES DE DESPESAS CARTÕES
-// ===============================
-function gerarTransacoesFaturasParceladas() {
-    const hoje = new Date();
-    const mesAtual = hoje.getMonth();
-    const anoAtual = hoje.getFullYear();
-    
-    // Gerar transações para os próximos 12 meses
-    for (let mesesAdicionar = 0; mesesAdicionar < 12; mesesAdicionar++) {
-        const dataAlvo = new Date(anoAtual, mesAtual + mesesAdicionar, 1);
-        const anoAlvo = dataAlvo.getFullYear();
-        const mesAlvo = dataAlvo.getMonth();
-        
-        faturasParceladas.forEach(fatura => {
+            // Processar apenas faturas ativas
+            if (fatura.ativa === false) return;
+            
             // Processar apenas parcelas não pagas
             fatura.parcelasDetalhes.forEach(parcela => {
                 if (parcela.paga) return;
@@ -1722,22 +1895,245 @@ function alternarStatusDespesaRecorrente(despesaId) {
 }
 
 function removerDespesaRecorrente(despesaId) {
-    if (!confirm("Deseja remover esta despesa recorrente? As transações já geradas não serão removidas.")) return;
+    if (!confirm("Deseja remover esta despesa recorrente? Todas as transações relacionadas serão removidas.")) return;
 
-    // Remover transações futuras relacionadas
-    const hoje = new Date();
-    transactions = transactions.filter(t => {
-        if (t.recorrenteId === despesaId) {
-            const dataTransacao = new Date(t.date);
-            return dataTransacao < hoje;
-        }
-        return true;
-    });
+    // Remover todas as transações relacionadas a esta despesa recorrente
+    transactions = transactions.filter(t => t.recorrenteId !== despesaId);
     
+    // Remover a despesa recorrente
     despesasRecorrentes = despesasRecorrentes.filter(d => d.id !== despesaId);
+    
+    // Salvar alterações
     salvarDespesasRecorrentesLocal();
     salvarLocal();
+    
+    // Atualizar interface
     atualizarTabelaDespesasRecorrentes();
+    updateUI(currentMonth, currentYear);
+}
+
+// ===============================
+//  RECEITAS RECORRENTES
+// ===============================
+
+function salvarReceitasRecorrentesLocal() {
+    localStorage.setItem("receitasRecorrentes", JSON.stringify(receitasRecorrentes));
+}
+
+function toggleReceitaRecorrenteForm() {
+    const container = document.getElementById('receitaRecorrenteFormContainer');
+    if (container) {
+        container.style.display = container.style.display === 'none' ? 'block' : 'none';
+        if (container.style.display === 'block') {
+            const hoje = new Date();
+            document.getElementById('receitaRecorrenteInicio').valueAsDate = hoje;
+        }
+    }
+}
+
+function adicionarReceitaRecorrente(e) {
+    e.preventDefault();
+
+    const descricao = document.getElementById('receitaRecorrenteDescricao').value.trim();
+    const categoria = document.getElementById('receitaRecorrenteCategoria').value.trim();
+    const valor = parseFloat(document.getElementById('receitaRecorrenteValor').value);
+    const dia = parseInt(document.getElementById('receitaRecorrenteDia').value);
+    const inicio = document.getElementById('receitaRecorrenteInicio').value;
+    const termino = document.getElementById('receitaRecorrenteTermino').value;
+    const obs = document.getElementById('receitaRecorrenteObs').value.trim();
+
+    if (!descricao || !categoria || isNaN(valor) || valor <= 0 || !dia || dia < 1 || dia > 31 || !inicio) {
+        alert("Preencha todos os campos obrigatórios corretamente!");
+        return;
+    }
+
+    const novaReceitaRecorrente = {
+        id: Date.now(),
+        descricao,
+        categoria,
+        valor,
+        dia,
+        inicio,
+        termino: termino || null,
+        obs: obs || "",
+        ativa: true,
+        dataCriacao: new Date().toISOString()
+    };
+
+    receitasRecorrentes.push(novaReceitaRecorrente);
+    salvarReceitasRecorrentesLocal();
+    
+    // Gerar transações automáticas
+    gerarTransacoesReceitasRecorrentes();
+    
+    atualizarTabelaReceitasRecorrentes();
+    updateUI(currentMonth, currentYear);
+    document.getElementById('receitaRecorrenteForm').reset();
+    const hoje = new Date();
+    document.getElementById('receitaRecorrenteInicio').valueAsDate = hoje;
+    toggleReceitaRecorrenteForm();
+
+    alert("Receita recorrente adicionada com sucesso!");
+}
+
+function gerarTransacoesReceitasRecorrentes() {
+    const hoje = new Date();
+    const mesAtual = hoje.getMonth();
+    const anoAtual = hoje.getFullYear();
+    
+    // Gerar transações para os próximos 12 meses
+    for (let mesesAdicionar = 0; mesesAdicionar < 12; mesesAdicionar++) {
+        const dataAlvo = new Date(anoAtual, mesAtual + mesesAdicionar, 1);
+        const anoAlvo = dataAlvo.getFullYear();
+        const mesAlvo = dataAlvo.getMonth();
+        
+        receitasRecorrentes.forEach(receita => {
+            // Processar apenas receitas ativas
+            if (!receita.ativa) return;
+            
+            const dataInicio = new Date(receita.inicio);
+            const dataTermino = receita.termino ? new Date(receita.termino) : null;
+
+            // Verificar se a receita se aplica ao mês atual
+            if (anoAlvo < dataInicio.getFullYear() || 
+                (anoAlvo === dataInicio.getFullYear() && mesAlvo < dataInicio.getMonth())) {
+                return;
+            }
+
+            // Verificar se a receita já terminou
+            if (dataTermino) {
+                if (anoAlvo > dataTermino.getFullYear() || 
+                    (anoAlvo === dataTermino.getFullYear() && mesAlvo > dataTermino.getMonth())) {
+                    return;
+                }
+            }
+            
+            // Criar data da transação
+            const diaTransacao = Math.min(receita.dia, new Date(anoAlvo, mesAlvo + 1, 0).getDate());
+            const dataTransacao = new Date(anoAlvo, mesAlvo, diaTransacao);
+            const dataTransacaoStr = dataTransacao.toISOString().split('T')[0];
+            
+            // Verificar se já existe uma transação para esta receita neste mês
+            const transacaoExistente = transactions.find(t => 
+                t.receitaRecorrenteId === receita.id && 
+                t.date === dataTransacaoStr
+            );
+            
+            if (!transacaoExistente) {
+                const novaTransacao = {
+                    id: Date.now() + Math.random(),
+                    date: dataTransacaoStr,
+                    type: "Receita",
+                    category: receita.categoria,
+                    amount: receita.valor,
+                    obs: receita.obs || `[Recorrente] ${receita.descricao}`,
+                    receitaRecorrenteId: receita.id
+                };
+                
+                transactions.push(novaTransacao);
+            }
+        });
+    }
+    
+    salvarLocal();
+}
+
+function atualizarTabelaReceitasRecorrentes() {
+    const tbody = document.getElementById('receitasRecorrentesTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (receitasRecorrentes.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-light);">
+                    Nenhuma receita recorrente cadastrada.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    receitasRecorrentes.forEach(receita => {
+        const valorFormatado = receita.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const dataInicio = new Date(receita.inicio).toLocaleDateString('pt-BR');
+        const dataTermino = receita.termino ? new Date(receita.termino).toLocaleDateString('pt-BR') : 'Permanente';
+        
+        const hoje = new Date();
+        const dataTerminoObj = receita.termino ? new Date(receita.termino) : null;
+        let status = receita.ativa ? 'Ativa' : 'Inativa';
+        let statusClass = receita.ativa ? 'accent-green' : 'accent-red';
+        
+        if (receita.ativa && dataTerminoObj && hoje > dataTerminoObj) {
+            status = 'Encerrada';
+            statusClass = 'accent-red';
+        }
+
+        tbody.innerHTML += `
+            <tr style="opacity: ${receita.ativa ? '1' : '0.6'};">
+                <td style="font-weight: 600;">${receita.descricao}</td>
+                <td>${receita.categoria}</td>
+                <td style="font-weight: 600; color: var(--accent-green);">${valorFormatado}</td>
+                <td>Dia ${receita.dia}</td>
+                <td>${dataInicio}</td>
+                <td>${dataTermino}</td>
+                <td style="color: var(--${statusClass}); font-weight: 600;">${status}</td>
+                <td>
+                    <button onclick="alternarStatusReceitaRecorrente(${receita.id})" class="btn-export" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
+                        <i class="fas fa-${receita.ativa ? 'pause' : 'play'}"></i> ${receita.ativa ? 'Desativar' : 'Ativar'}
+                    </button>
+                    <button onclick="removerReceitaRecorrente(${receita.id})" class="btn-clear" style="padding: 6px 12px; font-size: 0.85rem;">
+                        <i class="fas fa-trash"></i> Remover
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+function alternarStatusReceitaRecorrente(receitaId) {
+    const receita = receitasRecorrentes.find(r => r.id === receitaId);
+    if (!receita) return;
+
+    receita.ativa = !receita.ativa;
+    
+    // Se estiver desativando, remover transações futuras
+    if (!receita.ativa) {
+        const hoje = new Date();
+        transactions = transactions.filter(t => {
+            if (t.receitaRecorrenteId === receitaId) {
+                const dataTransacao = new Date(t.date);
+                return dataTransacao < hoje;
+            }
+            return true;
+        });
+        salvarLocal();
+    } else {
+        // Se estiver ativando, gerar transações futuras
+        gerarTransacoesReceitasRecorrentes();
+    }
+    
+    salvarReceitasRecorrentesLocal();
+    atualizarTabelaReceitasRecorrentes();
+    updateUI(currentMonth, currentYear);
+}
+
+function removerReceitaRecorrente(receitaId) {
+    if (!confirm("Deseja remover esta receita recorrente? Todas as transações relacionadas serão removidas.")) return;
+
+    // Remover todas as transações relacionadas a esta receita recorrente
+    transactions = transactions.filter(t => t.receitaRecorrenteId !== receitaId);
+    
+    // Remover a receita recorrente
+    receitasRecorrentes = receitasRecorrentes.filter(r => r.id !== receitaId);
+    
+    // Salvar alterações
+    salvarReceitasRecorrentesLocal();
+    salvarLocal();
+    
+    // Atualizar interface
+    atualizarTabelaReceitasRecorrentes();
     updateUI(currentMonth, currentYear);
 }
 
