@@ -63,6 +63,16 @@ document.addEventListener("DOMContentLoaded", () => {
     gerarTransacoesReceitasRecorrentes();
     gerarTransacoesFaturasParceladas();
     
+    // Configurar valores padrão dos seletores de PDF
+    const pdfMesSelect = document.getElementById('pdfMes');
+    const pdfAnoInput = document.getElementById('pdfAno');
+    if (pdfMesSelect) {
+        pdfMesSelect.value = currentMonth;
+    }
+    if (pdfAnoInput) {
+        pdfAnoInput.value = currentYear;
+    }
+    
     updateUI(currentMonth, currentYear);
     atualizarTabelaFaturas();
     atualizarTabelaDespesasRecorrentes();
@@ -611,11 +621,34 @@ function generatePDF() {
 // ===============================
 //  GERAR PDF POR MÊS
 // ===============================
-function gerarPDFMes(offset) {
-    const hoje = new Date();
-    hoje.setMonth(hoje.getMonth() + offset);
-    const mes = hoje.getMonth();
-    const ano = hoje.getFullYear();
+function gerarPDFSelecionado() {
+    const mesSelect = document.getElementById('pdfMes');
+    const anoInput = document.getElementById('pdfAno');
+    
+    if (!mesSelect || !anoInput) {
+        alert("Erro ao encontrar os campos de seleção!");
+        return;
+    }
+    
+    const mes = parseInt(mesSelect.value);
+    const ano = parseInt(anoInput.value);
+    
+    if (isNaN(mes) || isNaN(ano) || ano < 2020 || ano > 2100) {
+        alert("Por favor, selecione um mês e ano válidos!");
+        return;
+    }
+    
+    gerarPDFMes(mes, ano);
+}
+
+function gerarPDFMes(mes, ano) {
+    // Se receber apenas um parâmetro (offset), manter compatibilidade
+    if (arguments.length === 1) {
+        const hoje = new Date();
+        hoje.setMonth(hoje.getMonth() + mes);
+        mes = hoje.getMonth();
+        ano = hoje.getFullYear();
+    }
     
     // Obter dados do mês
     const rel = gerarRelatorioMensal(ano, mes);

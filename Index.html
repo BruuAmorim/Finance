@@ -126,10 +126,29 @@
 
         <section class="right-col" id="reportArea">
             <div class="card">
-                <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
-                    <button onclick="gerarPDFMes(-1)" class="btn-pdf" style="font-size: 0.8rem; padding: 6px 10px;">📄 PDF Mês Anterior</button>
-                    <button onclick="gerarPDFMes(0)" class="btn-pdf" style="font-size: 0.8rem; padding: 6px 10px;">📄 PDF Mês Atual</button>
-                    <button onclick="gerarPDFMes(1)" class="btn-pdf" style="font-size: 0.8rem; padding: 6px 10px;">📄 PDF Próximo Mês</button>
+                <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <select id="pdfMes" style="padding: 8px 12px; border: 2px solid var(--gray-border); border-radius: 8px; font-size: 0.9rem; background: white;">
+                            <option value="0">Janeiro</option>
+                            <option value="1">Fevereiro</option>
+                            <option value="2">Março</option>
+                            <option value="3">Abril</option>
+                            <option value="4">Maio</option>
+                            <option value="5">Junho</option>
+                            <option value="6">Julho</option>
+                            <option value="7">Agosto</option>
+                            <option value="8">Setembro</option>
+                            <option value="9">Outubro</option>
+                            <option value="10">Novembro</option>
+                            <option value="11">Dezembro</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <input type="number" id="pdfAno" min="2020" max="2100" value="2025" style="padding: 8px 12px; border: 2px solid var(--gray-border); border-radius: 8px; font-size: 0.9rem; width: 100px; background: white;">
+                    </div>
+                    <button onclick="gerarPDFSelecionado()" class="btn-pdf" style="font-size: 0.9rem; padding: 8px 16px;">
+                        <i class="fas fa-file-pdf"></i> Gerar PDF
+                    </button>
                 </div>
                 <div class="charts-area">
                     <div class="chart-box">
