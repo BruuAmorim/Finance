@@ -12,13 +12,59 @@ let isLoggedIn = false;
 let currentAuthForm = 'login'; // 'login' ou 'cadastro'
 
 // ===============================
-//  CONFIGURAÇÃO DO BACKEND
+//  CONFIGURAÇÃO DO SUPABASE
 // ===============================
-// Altere esta URL para o seu backend
-const API_URL = 'https://seu-backend.com/api'; // Substitua pela URL do seu backend
+const SUPABASE_URL = 'https://ffpmfqqvxeuvjcgyjsen.supabase.co';
+// Chave anon do Supabase
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmcG1mcXF2eGV1dmpjZ3lqc2VuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0NzE5OTgsImV4cCI6MjA4MTA0Nzk5OH0.XfcdBtF7aUnrsbDA_A4DEuX6KOvgOOa9bVvV2unYmJg';
 
-// Para desenvolvimento/teste, use localStorage como fallback
-const USE_LOCAL_STORAGE_AUTH = true; // Mude para false quando tiver backend
+// Inicializar cliente Supabase
+let supabase = null;
+let USE_SUPABASE = false;
+
+// Função para inicializar Supabase quando a biblioteca estiver carregada
+function inicializarSupabase() {
+    try {
+        // Verificar se a biblioteca Supabase está disponível
+        // O CDN do Supabase expõe a função createClient diretamente
+        if (typeof window !== 'undefined') {
+            // Tentar diferentes formas de acessar a biblioteca
+            let supabaseLib = null;
+            
+            if (window.supabase && window.supabase.createClient) {
+                supabaseLib = window.supabase;
+            } else if (window.supabaseClient) {
+                supabaseLib = window.supabaseClient;
+            } else if (typeof supabase !== 'undefined' && supabase.createClient) {
+                supabaseLib = supabase;
+            }
+            
+            if (supabaseLib) {
+                supabase = supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                USE_SUPABASE = true;
+                console.log('✅ Supabase inicializado com sucesso!');
+                console.log('URL:', SUPABASE_URL);
+                return true;
+            } else {
+                console.warn('⚠️ Biblioteca Supabase não encontrada. Verifique se o script foi carregado.');
+                console.warn('Tentando novamente em 500ms...');
+                // Tentar novamente após um delay
+                setTimeout(() => {
+                    if (window.supabase && window.supabase.createClient) {
+                        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                        USE_SUPABASE = true;
+                        console.log('✅ Supabase inicializado com sucesso (tentativa 2)!');
+                    }
+                }, 500);
+                return false;
+            }
+        }
+    } catch (e) {
+        console.error('❌ Erro ao inicializar Supabase:', e);
+        console.warn('Usando localStorage como fallback.');
+        return false;
+    }
+}
 
 // ===============================
 //  CARREGAR DO LOCALSTORAGE
@@ -68,9 +114,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if (faturaDiaPagamento) {
         faturaDiaPagamento.value = 10;
     }
-    // Verificar se usuário está logado
-    verificarLogin();
-    atualizarUIUsuario();
+    // Inicializar Supabase primeiro (antes de verificar login)
+    inicializarSupabase();
+    
+    // Aguardar um pouco para garantir que Supabase está pronto
+    setTimeout(() => {
+        // Verificar se usuário está logado
+        verificarLogin();
+        atualizarUIUsuario();
+    }, 100);
+    
+    // Inicializar Supabase
+    inicializarSupabase();
     
     initCharts();
     
@@ -2363,31 +2418,43 @@ function carregarModoEscuro() {
 //  SISTEMA DE AUTENTICAÇÃO
 // ===============================
 
-// Verificar se usuário está logado ao carregar
-document.addEventListener("DOMContentLoaded", () => {
-    verificarLogin();
-    atualizarUIUsuario();
-});
+// Verificar login será chamado no DOMContentLoaded principal
 
-function verificarLogin() {
-    if (USE_LOCAL_STORAGE_AUTH) {
-        const userData = localStorage.getItem('userData');
-        if (userData) {
-            try {
-                currentUser = JSON.parse(userData);
+async function verificarLogin() {
+    if (USE_SUPABASE && supabase) {
+        try {
+            // Verificar sessão do Supabase
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (session && session.user) {
+                currentUser = {
+                    email: session.user.email,
+                    nome: session.user.user_metadata?.nome || session.user.email,
+                    id: session.user.id
+                };
                 isLoggedIn = true;
                 atualizarUIUsuario();
-                // Carregar dados do servidor/localStorage
-                carregarDadosUsuario();
-            } catch (e) {
-                console.error('Erro ao carregar dados do usuário:', e);
+                await carregarDadosUsuario();
             }
+        } catch (e) {
+            console.error('Erro ao verificar sessão Supabase:', e);
+            // Fallback para localStorage
+            verificarLoginLocalStorage();
         }
     } else {
-        // Verificar token no backend
-        const token = localStorage.getItem('authToken');
-        if (token) {
-            verificarTokenBackend(token);
+        verificarLoginLocalStorage();
+    }
+}
+
+function verificarLoginLocalStorage() {
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+        try {
+            currentUser = JSON.parse(userData);
+            isLoggedIn = true;
+            atualizarUIUsuario();
+            carregarDadosUsuario();
+        } catch (e) {
+            console.error('Erro ao carregar dados do usuário:', e);
         }
     }
 }
@@ -2506,8 +2573,37 @@ async function fazerLogin() {
         return;
     }
     
-    if (USE_LOCAL_STORAGE_AUTH) {
-        // Autenticação com localStorage (para desenvolvimento)
+    if (USE_SUPABASE && supabase) {
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
+            
+            if (error) {
+                mostrarErro(error.message || 'Email ou senha incorretos!');
+                return;
+            }
+            
+            if (data.user) {
+                currentUser = {
+                    email: data.user.email,
+                    nome: data.user.user_metadata?.nome || data.user.email,
+                    id: data.user.id
+                };
+                isLoggedIn = true;
+                localStorage.setItem('userData', JSON.stringify(currentUser));
+                atualizarUIUsuario();
+                fecharModalAuth();
+                await carregarDadosUsuario();
+                alert('Login realizado com sucesso!');
+            }
+        } catch (error) {
+            console.error('Erro no login:', error);
+            mostrarErro('Erro ao fazer login. Tente novamente.');
+        }
+    } else {
+        // Fallback para localStorage
         const users = JSON.parse(localStorage.getItem('users') || '[]');
         const user = users.find(u => u.email === email && u.password === password);
         
@@ -2521,33 +2617,6 @@ async function fazerLogin() {
             alert('Login realizado com sucesso!');
         } else {
             mostrarErro('Email ou senha incorretos!');
-        }
-    } else {
-        // Autenticação com backend
-        try {
-            const response = await fetch(`${API_URL}/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                currentUser = data.user;
-                isLoggedIn = true;
-                localStorage.setItem('authToken', data.token);
-                localStorage.setItem('userData', JSON.stringify(currentUser));
-                atualizarUIUsuario();
-                fecharModalAuth();
-                carregarDadosUsuario();
-                alert('Login realizado com sucesso!');
-            } else {
-                mostrarErro(data.message || 'Erro ao fazer login!');
-            }
-        } catch (error) {
-            mostrarErro('Erro de conexão. Tente novamente.');
-            console.error('Erro:', error);
         }
     }
 }
@@ -2585,8 +2654,58 @@ async function fazerCadastro() {
             return;
         }
         
-        if (USE_LOCAL_STORAGE_AUTH) {
-            // Cadastro com localStorage (para desenvolvimento)
+        // Verificar novamente se Supabase está disponível
+        if (!USE_SUPABASE || !supabase) {
+            console.warn('Supabase não disponível, tentando inicializar...');
+            inicializarSupabase();
+        }
+        
+        if (USE_SUPABASE && supabase) {
+            try {
+                console.log('Tentando cadastrar usuário no Supabase...');
+                console.log('Email:', email);
+                
+                // Cadastrar usuário no Supabase
+                const { data, error } = await supabase.auth.signUp({
+                    email: email,
+                    password: password,
+                    options: {
+                        data: {
+                            nome: nome || 'Usuário'
+                        }
+                    }
+                });
+                
+                console.log('Resposta do Supabase:', { data, error });
+                
+                if (error) {
+                    console.error('Erro do Supabase:', error);
+                    mostrarErro(error.message || 'Erro ao cadastrar!');
+                    return;
+                }
+                
+                if (data && data.user) {
+                    currentUser = {
+                        email: data.user.email,
+                        nome: nome || 'Usuário',
+                        id: data.user.id
+                    };
+                    isLoggedIn = true;
+                    localStorage.setItem('userData', JSON.stringify(currentUser));
+                    atualizarUIUsuario();
+                    fecharModalAuth();
+                    await salvarDadosUsuario();
+                    alert('Cadastro realizado com sucesso! Verifique seu email para confirmar a conta.');
+                } else {
+                    console.warn('Nenhum usuário retornado do Supabase');
+                    mostrarErro('Erro ao criar usuário. Tente novamente.');
+                }
+            } catch (error) {
+                console.error('Erro no cadastro:', error);
+                mostrarErro('Erro ao cadastrar: ' + (error.message || 'Erro desconhecido'));
+            }
+        } else {
+            // Fallback para localStorage
             const users = JSON.parse(localStorage.getItem('users') || '[]');
             
             if (users.find(u => u.email === email)) {
@@ -2611,33 +2730,6 @@ async function fazerCadastro() {
             fecharModalAuth();
             salvarDadosUsuario();
             alert('Cadastro realizado com sucesso!');
-        } else {
-            // Cadastro com backend
-            try {
-                const response = await fetch(`${API_URL}/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ nome, email, password })
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    currentUser = data.user;
-                    isLoggedIn = true;
-                    localStorage.setItem('authToken', data.token);
-                    localStorage.setItem('userData', JSON.stringify(currentUser));
-                    atualizarUIUsuario();
-                    fecharModalAuth();
-                    salvarDadosUsuario();
-                    alert('Cadastro realizado com sucesso!');
-                } else {
-                    mostrarErro(data.message || 'Erro ao cadastrar!');
-                }
-            } catch (error) {
-                mostrarErro('Erro de conexão. Tente novamente.');
-                console.error('Erro:', error);
-            }
         }
     } catch (error) {
         console.error('Erro em fazerCadastro:', error);
@@ -2656,8 +2748,16 @@ function mostrarErro(mensagem) {
     }
 }
 
-function logout() {
+async function logout() {
     if (confirm('Deseja realmente sair? Seus dados locais serão mantidos.')) {
+        if (USE_SUPABASE && supabase) {
+            try {
+                await supabase.auth.signOut();
+            } catch (error) {
+                console.error('Erro ao fazer logout:', error);
+            }
+        }
+        
         currentUser = null;
         isLoggedIn = false;
         localStorage.removeItem('userData');
@@ -2679,43 +2779,66 @@ async function salvarDadosUsuario() {
         faturasParceladas,
         despesasRecorrentes,
         receitasRecorrentes,
-        userId: currentUser.email
+        user_id: currentUser.id || currentUser.email,
+        updated_at: new Date().toISOString()
     };
     
-    if (USE_LOCAL_STORAGE_AUTH) {
+    if (USE_SUPABASE && supabase) {
+        try {
+            // Salvar no Supabase na tabela user_data
+            const { error } = await supabase
+                .from('user_data')
+                .upsert({
+                    user_id: currentUser.id,
+                    transactions: dadosUsuario.transactions,
+                    faturas_parceladas: dadosUsuario.faturasParceladas,
+                    despesas_recorrentes: dadosUsuario.despesasRecorrentes,
+                    receitas_recorrentes: dadosUsuario.receitasRecorrentes,
+                    updated_at: dadosUsuario.updated_at
+                }, {
+                    onConflict: 'user_id'
+                });
+            
+            if (error) {
+                console.error('Erro ao salvar dados no Supabase:', error);
+                // Fallback para localStorage
+                localStorage.setItem(`userData_${currentUser.email}`, JSON.stringify(dadosUsuario));
+            }
+        } catch (error) {
+            console.error('Erro ao salvar dados:', error);
+            // Fallback para localStorage
+            localStorage.setItem(`userData_${currentUser.email}`, JSON.stringify(dadosUsuario));
+        }
+    } else {
         // Salvar no localStorage com prefixo do usuário
         localStorage.setItem(`userData_${currentUser.email}`, JSON.stringify(dadosUsuario));
-    } else {
-        // Salvar no backend
-        try {
-            const token = localStorage.getItem('authToken');
-            await fetch(`${API_URL}/save-data`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(dadosUsuario)
-            });
-        } catch (error) {
-            console.error('Erro ao salvar dados no servidor:', error);
-        }
     }
 }
 
 async function carregarDadosUsuario() {
     if (!isLoggedIn || !currentUser) return;
     
-    if (USE_LOCAL_STORAGE_AUTH) {
-        // Carregar do localStorage
-        const dadosSalvos = localStorage.getItem(`userData_${currentUser.email}`);
-        if (dadosSalvos) {
-            try {
-                const dados = JSON.parse(dadosSalvos);
-                transactions = dados.transactions || [];
-                faturasParceladas = dados.faturasParceladas || [];
-                despesasRecorrentes = dados.despesasRecorrentes || [];
-                receitasRecorrentes = dados.receitasRecorrentes || [];
+    if (USE_SUPABASE && supabase) {
+        try {
+            // Carregar do Supabase
+            const { data, error } = await supabase
+                .from('user_data')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .single();
+            
+            if (error && error.code !== 'PGRST116') { // PGRST116 = nenhuma linha encontrada
+                console.error('Erro ao carregar dados do Supabase:', error);
+                // Tentar carregar do localStorage como fallback
+                carregarDadosLocalStorage();
+                return;
+            }
+            
+            if (data) {
+                transactions = data.transactions || [];
+                faturasParceladas = data.faturas_parceladas || [];
+                despesasRecorrentes = data.despesas_recorrentes || [];
+                receitasRecorrentes = data.receitas_recorrentes || [];
                 
                 // Atualizar localStorage padrão
                 salvarLocal();
@@ -2728,41 +2851,42 @@ async function carregarDadosUsuario() {
                 atualizarTabelaFaturas();
                 atualizarTabelaDespesasRecorrentes();
                 atualizarTabelaReceitasRecorrentes();
-            } catch (e) {
-                console.error('Erro ao carregar dados do usuário:', e);
-            }
-        }
-    } else {
-        // Carregar do backend
-        try {
-            const token = localStorage.getItem('authToken');
-            const response = await fetch(`${API_URL}/load-data`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            
-            if (response.ok) {
-                const dados = await response.json();
-                transactions = dados.transactions || [];
-                faturasParceladas = dados.faturasParceladas || [];
-                despesasRecorrentes = dados.despesasRecorrentes || [];
-                receitasRecorrentes = dados.receitasRecorrentes || [];
-                
-                // Atualizar localStorage
-                salvarLocal();
-                salvarFaturasLocal();
-                salvarDespesasRecorrentesLocal();
-                salvarReceitasRecorrentesLocal();
-                
-                // Atualizar UI
-                updateUI(currentMonth, currentYear);
-                atualizarTabelaFaturas();
-                atualizarTabelaDespesasRecorrentes();
-                atualizarTabelaReceitasRecorrentes();
+            } else {
+                // Se não houver dados no Supabase, tentar localStorage
+                carregarDadosLocalStorage();
             }
         } catch (error) {
-            console.error('Erro ao carregar dados do servidor:', error);
+            console.error('Erro ao carregar dados:', error);
+            carregarDadosLocalStorage();
+        }
+    } else {
+        carregarDadosLocalStorage();
+    }
+}
+
+function carregarDadosLocalStorage() {
+    const dadosSalvos = localStorage.getItem(`userData_${currentUser.email}`);
+    if (dadosSalvos) {
+        try {
+            const dados = JSON.parse(dadosSalvos);
+            transactions = dados.transactions || [];
+            faturasParceladas = dados.faturasParceladas || [];
+            despesasRecorrentes = dados.despesasRecorrentes || [];
+            receitasRecorrentes = dados.receitasRecorrentes || [];
+            
+            // Atualizar localStorage padrão
+            salvarLocal();
+            salvarFaturasLocal();
+            salvarDespesasRecorrentesLocal();
+            salvarReceitasRecorrentesLocal();
+            
+            // Atualizar UI
+            updateUI(currentMonth, currentYear);
+            atualizarTabelaFaturas();
+            atualizarTabelaDespesasRecorrentes();
+            atualizarTabelaReceitasRecorrentes();
+        } catch (e) {
+            console.error('Erro ao carregar dados do usuário:', e);
         }
     }
 }
