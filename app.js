@@ -7,6 +7,18 @@ let despesasRecorrentes = [];
 let receitasRecorrentes = [];
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
+let currentUser = null;
+let isLoggedIn = false;
+let currentAuthForm = 'login'; // 'login' ou 'cadastro'
+
+// ===============================
+//  CONFIGURAÇÃO DO BACKEND
+// ===============================
+// Altere esta URL para o seu backend
+const API_URL = 'https://seu-backend.com/api'; // Substitua pela URL do seu backend
+
+// Para desenvolvimento/teste, use localStorage como fallback
+const USE_LOCAL_STORAGE_AUTH = true; // Mude para false quando tiver backend
 
 // ===============================
 //  CARREGAR DO LOCALSTORAGE
@@ -56,6 +68,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (faturaDiaPagamento) {
         faturaDiaPagamento.value = 10;
     }
+    // Verificar se usuário está logado
+    verificarLogin();
+    atualizarUIUsuario();
+    
     initCharts();
     
     // Gerar transações automáticas de despesas recorrentes, receitas recorrentes e despesas cartões
@@ -113,6 +129,9 @@ document.addEventListener("DOMContentLoaded", () => {
 // ===============================
 function salvarLocal() {
     localStorage.setItem("transactions", JSON.stringify(transactions));
+    if (isLoggedIn) {
+        salvarDadosUsuario();
+    }
 }
 
 // ===============================
@@ -844,6 +863,9 @@ function atualizarGraficoLinha(transacoes, mes, ano) {
 
 function salvarFaturasLocal() {
     localStorage.setItem("faturasParceladas", JSON.stringify(faturasParceladas));
+    if (isLoggedIn) {
+        salvarDadosUsuario();
+    }
 }
 
 function toggleFaturaForm() {
@@ -1491,6 +1513,9 @@ function removerFatura(faturaId) {
 
 function salvarDespesasRecorrentesLocal() {
     localStorage.setItem("despesasRecorrentes", JSON.stringify(despesasRecorrentes));
+    if (isLoggedIn) {
+        salvarDadosUsuario();
+    }
 }
 
 function toggleDespesaRecorrenteForm() {
@@ -1944,6 +1969,9 @@ function removerDespesaRecorrente(despesaId) {
 
 function salvarReceitasRecorrentesLocal() {
     localStorage.setItem("receitasRecorrentes", JSON.stringify(receitasRecorrentes));
+    if (isLoggedIn) {
+        salvarDadosUsuario();
+    }
 }
 
 function toggleReceitaRecorrenteForm() {
@@ -2330,3 +2358,414 @@ function carregarModoEscuro() {
     }
     // Se não houver preferência, manter o padrão do sistema (via CSS media query)
 }
+
+// ===============================
+//  SISTEMA DE AUTENTICAÇÃO
+// ===============================
+
+// Verificar se usuário está logado ao carregar
+document.addEventListener("DOMContentLoaded", () => {
+    verificarLogin();
+    atualizarUIUsuario();
+});
+
+function verificarLogin() {
+    if (USE_LOCAL_STORAGE_AUTH) {
+        const userData = localStorage.getItem('userData');
+        if (userData) {
+            try {
+                currentUser = JSON.parse(userData);
+                isLoggedIn = true;
+                atualizarUIUsuario();
+                // Carregar dados do servidor/localStorage
+                carregarDadosUsuario();
+            } catch (e) {
+                console.error('Erro ao carregar dados do usuário:', e);
+            }
+        }
+    } else {
+        // Verificar token no backend
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            verificarTokenBackend(token);
+        }
+    }
+}
+
+async function verificarTokenBackend(token) {
+    try {
+        const response = await fetch(`${API_URL}/verify-token`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            currentUser = data.user;
+            isLoggedIn = true;
+            atualizarUIUsuario();
+            carregarDadosUsuario();
+        } else {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userData');
+        }
+    } catch (error) {
+        console.error('Erro ao verificar token:', error);
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userData');
+    }
+}
+
+function atualizarUIUsuario() {
+    const userEmailEl = document.getElementById('userEmail');
+    const loginButton = document.getElementById('loginButton');
+    const logoutButton = document.getElementById('logoutButton');
+    
+    if (isLoggedIn && currentUser) {
+        if (userEmailEl) userEmailEl.textContent = currentUser.email;
+        if (userEmailEl) userEmailEl.style.display = 'block';
+        if (loginButton) loginButton.style.display = 'none';
+        if (logoutButton) logoutButton.style.display = 'block';
+    } else {
+        if (userEmailEl) userEmailEl.style.display = 'none';
+        if (loginButton) loginButton.style.display = 'block';
+        if (logoutButton) logoutButton.style.display = 'none';
+    }
+}
+
+function abrirModalLogin() {
+    const modal = document.getElementById('authModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        mostrarLogin();
+    }
+}
+
+function fecharModalAuth() {
+    const modal = document.getElementById('authModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.getElementById('authError').style.display = 'none';
+        document.getElementById('authForm').reset();
+    }
+}
+
+function mostrarLogin() {
+    currentAuthForm = 'login';
+    document.getElementById('loginForm').style.display = 'block';
+    document.getElementById('cadastroForm').style.display = 'none';
+    document.getElementById('authModalTitle').textContent = 'Entrar';
+    document.getElementById('authButtonText').textContent = 'Entrar';
+    document.getElementById('loginTab').style.borderBottomColor = 'var(--primary-blue)';
+    document.getElementById('loginTab').style.color = 'var(--primary-blue)';
+    document.getElementById('cadastroTab').style.borderBottomColor = 'transparent';
+    document.getElementById('cadastroTab').style.color = 'var(--text-medium)';
+    document.getElementById('authError').style.display = 'none';
+}
+
+function mostrarCadastro() {
+    currentAuthForm = 'cadastro';
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('cadastroForm').style.display = 'block';
+    document.getElementById('authModalTitle').textContent = 'Cadastrar';
+    document.getElementById('authButtonText').textContent = 'Cadastrar';
+    document.getElementById('cadastroTab').style.borderBottomColor = 'var(--primary-blue)';
+    document.getElementById('cadastroTab').style.color = 'var(--primary-blue)';
+    document.getElementById('loginTab').style.borderBottomColor = 'transparent';
+    document.getElementById('loginTab').style.color = 'var(--text-medium)';
+    document.getElementById('authError').style.display = 'none';
+}
+
+async function handleAuth(e) {
+    e.preventDefault();
+    const errorDiv = document.getElementById('authError');
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+    }
+    
+    try {
+        // Usar a variável global para determinar qual formulário está ativo
+        if (currentAuthForm === 'login') {
+            await fazerLogin();
+        } else {
+            await fazerCadastro();
+        }
+    } catch (error) {
+        console.error('Erro no handleAuth:', error);
+        mostrarErro('Ocorreu um erro. Por favor, tente novamente.');
+    }
+}
+
+async function fazerLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    
+    if (!email || !password) {
+        mostrarErro('Preencha todos os campos!');
+        return;
+    }
+    
+    if (USE_LOCAL_STORAGE_AUTH) {
+        // Autenticação com localStorage (para desenvolvimento)
+        const users = JSON.parse(localStorage.getItem('users') || '[]');
+        const user = users.find(u => u.email === email && u.password === password);
+        
+        if (user) {
+            currentUser = { email: user.email, nome: user.nome };
+            isLoggedIn = true;
+            localStorage.setItem('userData', JSON.stringify(currentUser));
+            atualizarUIUsuario();
+            fecharModalAuth();
+            carregarDadosUsuario();
+            alert('Login realizado com sucesso!');
+        } else {
+            mostrarErro('Email ou senha incorretos!');
+        }
+    } else {
+        // Autenticação com backend
+        try {
+            const response = await fetch(`${API_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                currentUser = data.user;
+                isLoggedIn = true;
+                localStorage.setItem('authToken', data.token);
+                localStorage.setItem('userData', JSON.stringify(currentUser));
+                atualizarUIUsuario();
+                fecharModalAuth();
+                carregarDadosUsuario();
+                alert('Login realizado com sucesso!');
+            } else {
+                mostrarErro(data.message || 'Erro ao fazer login!');
+            }
+        } catch (error) {
+            mostrarErro('Erro de conexão. Tente novamente.');
+            console.error('Erro:', error);
+        }
+    }
+}
+
+async function fazerCadastro() {
+    try {
+        const nomeEl = document.getElementById('cadastroNome');
+        const emailEl = document.getElementById('cadastroEmail');
+        const passwordEl = document.getElementById('cadastroPassword');
+        const passwordConfirmEl = document.getElementById('cadastroPasswordConfirm');
+        
+        if (!nomeEl || !emailEl || !passwordEl || !passwordConfirmEl) {
+            mostrarErro('Erro ao acessar os campos do formulário. Recarregue a página.');
+            console.error('Elementos do formulário não encontrados');
+            return;
+        }
+        
+        const nome = nomeEl.value.trim();
+        const email = emailEl.value.trim();
+        const password = passwordEl.value;
+        const passwordConfirm = passwordConfirmEl.value;
+        
+        if (!email || !password || !passwordConfirm) {
+            mostrarErro('Preencha todos os campos obrigatórios!');
+            return;
+        }
+        
+        if (password.length < 6) {
+            mostrarErro('A senha deve ter no mínimo 6 caracteres!');
+            return;
+        }
+        
+        if (password !== passwordConfirm) {
+            mostrarErro('As senhas não coincidem!');
+            return;
+        }
+        
+        if (USE_LOCAL_STORAGE_AUTH) {
+            // Cadastro com localStorage (para desenvolvimento)
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            
+            if (users.find(u => u.email === email)) {
+                mostrarErro('Este email já está cadastrado!');
+                return;
+            }
+            
+            const newUser = {
+                id: Date.now(),
+                nome: nome || 'Usuário',
+                email,
+                password: password // Em produção, isso deve ser criptografado!
+            };
+            
+            users.push(newUser);
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            currentUser = { email: newUser.email, nome: newUser.nome };
+            isLoggedIn = true;
+            localStorage.setItem('userData', JSON.stringify(currentUser));
+            atualizarUIUsuario();
+            fecharModalAuth();
+            salvarDadosUsuario();
+            alert('Cadastro realizado com sucesso!');
+        } else {
+            // Cadastro com backend
+            try {
+                const response = await fetch(`${API_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome, email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentUser = data.user;
+                    isLoggedIn = true;
+                    localStorage.setItem('authToken', data.token);
+                    localStorage.setItem('userData', JSON.stringify(currentUser));
+                    atualizarUIUsuario();
+                    fecharModalAuth();
+                    salvarDadosUsuario();
+                    alert('Cadastro realizado com sucesso!');
+                } else {
+                    mostrarErro(data.message || 'Erro ao cadastrar!');
+                }
+            } catch (error) {
+                mostrarErro('Erro de conexão. Tente novamente.');
+                console.error('Erro:', error);
+            }
+        }
+    } catch (error) {
+        console.error('Erro em fazerCadastro:', error);
+        mostrarErro('Ocorreu um erro ao processar o cadastro: ' + (error.message || 'Erro desconhecido'));
+    }
+}
+
+function mostrarErro(mensagem) {
+    const errorDiv = document.getElementById('authError');
+    if (errorDiv) {
+        errorDiv.textContent = mensagem;
+        errorDiv.style.display = 'block';
+    } else {
+        console.error('Erro de autenticação:', mensagem);
+        alert(mensagem); // Fallback caso o elemento não exista
+    }
+}
+
+function logout() {
+    if (confirm('Deseja realmente sair? Seus dados locais serão mantidos.')) {
+        currentUser = null;
+        isLoggedIn = false;
+        localStorage.removeItem('userData');
+        localStorage.removeItem('authToken');
+        atualizarUIUsuario();
+        alert('Logout realizado com sucesso!');
+    }
+}
+
+// ===============================
+//  SINCRONIZAÇÃO DE DADOS
+// ===============================
+
+async function salvarDadosUsuario() {
+    if (!isLoggedIn || !currentUser) return;
+    
+    const dadosUsuario = {
+        transactions,
+        faturasParceladas,
+        despesasRecorrentes,
+        receitasRecorrentes,
+        userId: currentUser.email
+    };
+    
+    if (USE_LOCAL_STORAGE_AUTH) {
+        // Salvar no localStorage com prefixo do usuário
+        localStorage.setItem(`userData_${currentUser.email}`, JSON.stringify(dadosUsuario));
+    } else {
+        // Salvar no backend
+        try {
+            const token = localStorage.getItem('authToken');
+            await fetch(`${API_URL}/save-data`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(dadosUsuario)
+            });
+        } catch (error) {
+            console.error('Erro ao salvar dados no servidor:', error);
+        }
+    }
+}
+
+async function carregarDadosUsuario() {
+    if (!isLoggedIn || !currentUser) return;
+    
+    if (USE_LOCAL_STORAGE_AUTH) {
+        // Carregar do localStorage
+        const dadosSalvos = localStorage.getItem(`userData_${currentUser.email}`);
+        if (dadosSalvos) {
+            try {
+                const dados = JSON.parse(dadosSalvos);
+                transactions = dados.transactions || [];
+                faturasParceladas = dados.faturasParceladas || [];
+                despesasRecorrentes = dados.despesasRecorrentes || [];
+                receitasRecorrentes = dados.receitasRecorrentes || [];
+                
+                // Atualizar localStorage padrão
+                salvarLocal();
+                salvarFaturasLocal();
+                salvarDespesasRecorrentesLocal();
+                salvarReceitasRecorrentesLocal();
+                
+                // Atualizar UI
+                updateUI(currentMonth, currentYear);
+                atualizarTabelaFaturas();
+                atualizarTabelaDespesasRecorrentes();
+                atualizarTabelaReceitasRecorrentes();
+            } catch (e) {
+                console.error('Erro ao carregar dados do usuário:', e);
+            }
+        }
+    } else {
+        // Carregar do backend
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`${API_URL}/load-data`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (response.ok) {
+                const dados = await response.json();
+                transactions = dados.transactions || [];
+                faturasParceladas = dados.faturasParceladas || [];
+                despesasRecorrentes = dados.despesasRecorrentes || [];
+                receitasRecorrentes = dados.receitasRecorrentes || [];
+                
+                // Atualizar localStorage
+                salvarLocal();
+                salvarFaturasLocal();
+                salvarDespesasRecorrentesLocal();
+                salvarReceitasRecorrentesLocal();
+                
+                // Atualizar UI
+                updateUI(currentMonth, currentYear);
+                atualizarTabelaFaturas();
+                atualizarTabelaDespesasRecorrentes();
+                atualizarTabelaReceitasRecorrentes();
+            }
+        } catch (error) {
+            console.error('Erro ao carregar dados do servidor:', error);
+        }
+    }
+}
+
+// Funções de salvar serão modificadas para também salvar no servidor quando o usuário estiver logado
+// Isso é feito automaticamente através da função salvarDadosUsuario() que é chamada após cada salvamento
