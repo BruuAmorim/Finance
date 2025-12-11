@@ -21,12 +21,18 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Inicializar cliente Supabase
 let supabase = null;
 let USE_SUPABASE = false;
+let supabaseInicializado = false; // Flag para evitar múltiplas inicializações
 
 // Função para inicializar Supabase quando a biblioteca estiver carregada
 function inicializarSupabase() {
+    // Evitar múltiplas inicializações
+    if (supabaseInicializado && supabase) {
+        console.log('Supabase já inicializado, reutilizando instância existente.');
+        return true;
+    }
+    
     try {
         // Verificar se a biblioteca Supabase está disponível
-        // O CDN do Supabase expõe a função createClient diretamente
         if (typeof window !== 'undefined') {
             // Tentar diferentes formas de acessar a biblioteca
             let supabaseLib = null;
@@ -40,22 +46,17 @@ function inicializarSupabase() {
             }
             
             if (supabaseLib) {
-                supabase = supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                USE_SUPABASE = true;
-                console.log('✅ Supabase inicializado com sucesso!');
-                console.log('URL:', SUPABASE_URL);
+                // Criar apenas uma instância
+                if (!supabase) {
+                    supabase = supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    USE_SUPABASE = true;
+                    supabaseInicializado = true;
+                    console.log('✅ Supabase inicializado com sucesso!');
+                    console.log('URL:', SUPABASE_URL);
+                }
                 return true;
             } else {
                 console.warn('⚠️ Biblioteca Supabase não encontrada. Verifique se o script foi carregado.');
-                console.warn('Tentando novamente em 500ms...');
-                // Tentar novamente após um delay
-                setTimeout(() => {
-                    if (window.supabase && window.supabase.createClient) {
-                        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                        USE_SUPABASE = true;
-                        console.log('✅ Supabase inicializado com sucesso (tentativa 2)!');
-                    }
-                }, 500);
                 return false;
             }
         }
@@ -2520,8 +2521,22 @@ function fecharModalAuth() {
 
 function mostrarLogin() {
     currentAuthForm = 'login';
-    document.getElementById('loginForm').style.display = 'block';
-    document.getElementById('cadastroForm').style.display = 'none';
+    const loginForm = document.getElementById('loginForm');
+    const cadastroForm = document.getElementById('cadastroForm');
+    
+    loginForm.style.display = 'block';
+    cadastroForm.style.display = 'none';
+    
+    // Remover required dos campos ocultos para evitar erro de validação
+    cadastroForm.querySelectorAll('input[required]').forEach(input => {
+        input.removeAttribute('required');
+    });
+    
+    // Adicionar required aos campos visíveis
+    loginForm.querySelectorAll('input[type="email"], input[type="password"]').forEach(input => {
+        input.setAttribute('required', 'required');
+    });
+    
     document.getElementById('authModalTitle').textContent = 'Entrar';
     document.getElementById('authButtonText').textContent = 'Entrar';
     document.getElementById('loginTab').style.borderBottomColor = 'var(--primary-blue)';
@@ -2533,8 +2548,22 @@ function mostrarLogin() {
 
 function mostrarCadastro() {
     currentAuthForm = 'cadastro';
-    document.getElementById('loginForm').style.display = 'none';
-    document.getElementById('cadastroForm').style.display = 'block';
+    const loginForm = document.getElementById('loginForm');
+    const cadastroForm = document.getElementById('cadastroForm');
+    
+    loginForm.style.display = 'none';
+    cadastroForm.style.display = 'block';
+    
+    // Remover required dos campos ocultos para evitar erro de validação
+    loginForm.querySelectorAll('input[required]').forEach(input => {
+        input.removeAttribute('required');
+    });
+    
+    // Adicionar required aos campos visíveis
+    cadastroForm.querySelectorAll('input[type="email"], input[type="password"][id="cadastroPassword"], input[type="password"][id="cadastroPasswordConfirm"]').forEach(input => {
+        input.setAttribute('required', 'required');
+    });
+    
     document.getElementById('authModalTitle').textContent = 'Cadastrar';
     document.getElementById('authButtonText').textContent = 'Cadastrar';
     document.getElementById('cadastroTab').style.borderBottomColor = 'var(--primary-blue)';
@@ -2693,8 +2722,38 @@ async function fazerCadastro() {
                     isLoggedIn = true;
                     localStorage.setItem('userData', JSON.stringify(currentUser));
                     atualizarUIUsuario();
+                    
+                    // Criar registro inicial na tabela user_data usando INSERT direto
+                    // A política RLS permitirá se auth.uid() = user_id
+                    try {
+                        const { error: createError } = await supabase
+                            .from('user_data')
+                            .insert({
+                                user_id: data.user.id,
+                                transactions: [],
+                                faturas_parceladas: [],
+                                despesas_recorrentes: [],
+                                receitas_recorrentes: [],
+                                updated_at: new Date().toISOString()
+                            });
+                        
+                        if (createError) {
+                            console.warn('Aviso ao criar dados iniciais:', createError);
+                            // Não bloquear o cadastro se falhar, tentar salvar depois
+                        } else {
+                            console.log('Registro inicial criado com sucesso');
+                        }
+                    } catch (insertError) {
+                        console.warn('Erro ao criar registro inicial:', insertError);
+                    }
+                    
                     fecharModalAuth();
-                    await salvarDadosUsuario();
+                    
+                    // Tentar salvar dados após um pequeno delay para garantir que a sessão está ativa
+                    setTimeout(async () => {
+                        await salvarDadosUsuario();
+                    }, 500);
+                    
                     alert('Cadastro realizado com sucesso! Verifique seu email para confirmar a conta.');
                 } else {
                     console.warn('Nenhum usuário retornado do Supabase');
@@ -2785,7 +2844,36 @@ async function salvarDadosUsuario() {
     
     if (USE_SUPABASE && supabase) {
         try {
-            // Salvar no Supabase na tabela user_data
+            // Verificar se o registro já existe
+            const { data: existingData, error: checkError } = await supabase
+                .from('user_data')
+                .select('user_id')
+                .eq('user_id', currentUser.id)
+                .single();
+            
+            // Se não existir, criar primeiro usando INSERT direto
+            if (checkError && checkError.code === 'PGRST116') {
+                console.log('Registro não existe, criando...');
+                const { error: createError } = await supabase
+                    .from('user_data')
+                    .insert({
+                        user_id: currentUser.id,
+                        transactions: [],
+                        faturas_parceladas: [],
+                        despesas_recorrentes: [],
+                        receitas_recorrentes: [],
+                        updated_at: new Date().toISOString()
+                    });
+                
+                if (createError) {
+                    console.error('Erro ao criar registro inicial:', createError);
+                    // Fallback para localStorage
+                    localStorage.setItem(`userData_${currentUser.email}`, JSON.stringify(dadosUsuario));
+                    return;
+                }
+            }
+            
+            // Agora fazer o upsert
             const { error } = await supabase
                 .from('user_data')
                 .upsert({
@@ -2803,6 +2891,8 @@ async function salvarDadosUsuario() {
                 console.error('Erro ao salvar dados no Supabase:', error);
                 // Fallback para localStorage
                 localStorage.setItem(`userData_${currentUser.email}`, JSON.stringify(dadosUsuario));
+            } else {
+                console.log('Dados salvos com sucesso no Supabase');
             }
         } catch (error) {
             console.error('Erro ao salvar dados:', error);
