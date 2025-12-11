@@ -42,11 +42,20 @@ document.addEventListener("DOMContentLoaded", () => {
         receitasRecorrentes = JSON.parse(dadosReceitasRecorrentes);
     }
 
-    document.getElementById('date').valueAsDate = new Date();
+    const dateInput = document.getElementById('date');
+    if (dateInput) {
+        dateInput.valueAsDate = new Date();
+    }
     const hoje = new Date();
-    document.getElementById('faturaDataInicio').valueAsDate = hoje;
+    const faturaDataInicio = document.getElementById('faturaDataInicio');
+    if (faturaDataInicio) {
+        faturaDataInicio.valueAsDate = hoje;
+    }
     // Dia de pagamento padrão: dia 10
-    document.getElementById('faturaDiaPagamento').value = 10;
+    const faturaDiaPagamento = document.getElementById('faturaDiaPagamento');
+    if (faturaDiaPagamento) {
+        faturaDiaPagamento.value = 10;
+    }
     initCharts();
     
     // Gerar transações automáticas de despesas recorrentes, receitas recorrentes e despesas cartões
@@ -56,8 +65,8 @@ document.addEventListener("DOMContentLoaded", () => {
     
     updateUI(currentMonth, currentYear);
     atualizarTabelaFaturas();
-    atualizarFiltros();
     atualizarTabelaDespesasRecorrentes();
+    atualizarTabelaReceitasRecorrentes();
     
     // Adicionar event listener ao formulário
     const form = document.getElementById("expenseForm");
@@ -102,8 +111,16 @@ function salvarLocal() {
 let lineChart, pieChart;
 
 function initCharts() {
-    const ctxLine = document.getElementById('lineChart').getContext('2d');
-    const ctxPie = document.getElementById('pieChart').getContext('2d');
+    const lineChartEl = document.getElementById('lineChart');
+    const pieChartEl = document.getElementById('pieChart');
+    
+    if (!lineChartEl || !pieChartEl) {
+        console.warn('Elementos dos gráficos não encontrados');
+        return;
+    }
+    
+    const ctxLine = lineChartEl.getContext('2d');
+    const ctxPie = pieChartEl.getContext('2d');
 
     let gradient = ctxLine.createLinearGradient(0, 0, 0, 400);
     gradient.addColorStop(0, 'rgba(66,165,245,0.5)');
@@ -155,8 +172,8 @@ function updateUI(filterMonth = null, filterYear = null) {
     const totalDespesasEl = document.getElementById('totalDespesas');
     const saldoMesEl = document.getElementById('saldoMes');
 
-    listSimple.innerHTML = "";
-    tableBody.innerHTML = "";
+    if (listSimple) listSimple.innerHTML = "";
+    if (tableBody) tableBody.innerHTML = "";
 
     // Filtrar transações se um mês/ano específico foi solicitado
     let transacoesParaExibir = transactions;
@@ -173,7 +190,7 @@ function updateUI(filterMonth = null, filterYear = null) {
     }
 
     let total = 0;
-    let categories = {};
+    let descriptions = {};
     let receitas = 0;
     let despesas = 0;
 
@@ -186,35 +203,46 @@ function updateUI(filterMonth = null, filterYear = null) {
             despesas += t.amount;
         }
 
-        if (!categories[t.category]) categories[t.category] = 0;
-        categories[t.category] += t.amount;
+        const desc = t.obs || t.category || 'Sem descrição';
+        if (!descriptions[desc]) descriptions[desc] = 0;
+        descriptions[desc] += t.amount;
 
         const money = t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-        listSimple.innerHTML += `
-            <div class="transaction-item">
-                <div class="t-info">
-                    <h4>${t.category}</h4>
-                    <span>${t.date}</span>
+        if (listSimple) {
+            listSimple.innerHTML += `
+                <div class="transaction-item">
+                    <div class="t-info">
+                        <h4>${desc}</h4>
+                        <span>${t.date}</span>
+                    </div>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <span class="t-value ${t.type === "Receita" ? "income" : "expense"}">
+                            ${t.type === "Receita" ? "+" : "-"} ${money}
+                        </span>
+                        <i class="fas fa-trash-alt" onclick="removeTransaction(${t.id})"></i>
+                    </div>
                 </div>
-                <div style="display:flex; gap:10px; align-items:center;">
-                    <span class="t-value ${t.type === "Receita" ? "income" : "expense"}">
-                        ${t.type === "Receita" ? "+" : "-"} ${money}
-                    </span>
-                    <i class="fas fa-trash-alt" onclick="removeTransaction(${t.id})"></i>
-                </div>
-            </div>
-        `;
+            `;
+        }
 
-        tableBody.innerHTML += `
-            <tr>
-                <td>${t.date}</td>
-                <td>${t.category}</td>
-                <td style="color:${t.type === "Receita" ? "#66bb6a" : "#e53935"}">${t.type}</td>
-                <td>${money}</td>
-                <td>${t.obs || ""}</td>
-            </tr>
-        `;
+        // Mostrar OBS apenas para despesas recorrentes e despesas cartão
+        let obsDisplay = "";
+        if (t.recorrenteId || t.faturaId) {
+            obsDisplay = t.obs || "";
+        }
+
+        if (tableBody) {
+            tableBody.innerHTML += `
+                <tr>
+                    <td>${t.date}</td>
+                    <td>${desc}</td>
+                    <td style="color:${t.type === "Receita" ? "#66bb6a" : "#e53935"}">${t.type}</td>
+                    <td>${money}</td>
+                    <td>${obsDisplay}</td>
+                </tr>
+            `;
+        }
     });
 
     // Atualizar estatísticas do mês
@@ -233,9 +261,11 @@ function updateUI(filterMonth = null, filterYear = null) {
     atualizarTotaisRecorrentes(filterMonth, filterYear);
 
     // Atualizar gráfico de pizza
-    pieChart.data.labels = Object.keys(categories);
-    pieChart.data.datasets[0].data = Object.values(categories);
-    pieChart.update();
+    if (pieChart) {
+        pieChart.data.labels = Object.keys(descriptions);
+        pieChart.data.datasets[0].data = Object.values(descriptions);
+        pieChart.update();
+    }
 
     // Atualizar gráfico de linha com dados semanais do mês
     atualizarGraficoLinha(transacoesParaExibir, filterMonth, filterYear);
@@ -246,22 +276,15 @@ function updateUI(filterMonth = null, filterYear = null) {
 function addTransaction(e) {
     e.preventDefault();
 
-    // Capturar campos dinamicamente
-    const dateInput = document.getElementById("date");
-    const typeInput = document.getElementById("type");
-    const categoryInput = document.getElementById("category");
-    const amountInput = document.getElementById("amount");
-    const obsInput = document.getElementById("obs");
-
-    const date = dateInput.value;
-    const type = typeInput.value;
-    const category = categoryInput.value.trim();
-    const amount = parseFloat(amountInput.value);
-    const obs = obsInput.value.trim();
+    const date = document.getElementById("date").value;
+    const type = document.getElementById("type").value;
+    const amount = parseFloat(document.getElementById("amount").value);
+    const descricao = document.getElementById("descricao").value.trim();
+    const obs = document.getElementById("obs").value.trim();
 
     // Validação
-    if (!date || !category || isNaN(amount) || amount <= 0) {
-        alert("Preencha todos os campos corretamente! O valor deve ser maior que zero.");
+    if (!date || !descricao || isNaN(amount) || amount <= 0) {
+        alert("Preencha todos os campos obrigatórios corretamente! O valor deve ser maior que zero.");
         return;
     }
 
@@ -269,7 +292,7 @@ function addTransaction(e) {
         id: Date.now(),
         date, 
         type, 
-        category,
+        category: descricao,
         amount,
         obs: obs || ""
     };
@@ -430,14 +453,15 @@ function exportExcel() {
                 }
 
                 // Criar identificação única
-                const identificacao = `${t.type.substring(0, 3).toUpperCase()}_${t.category.toUpperCase().replace(/\s+/g, '_')}_${String(idx + 1).padStart(3, '0')}`;
+                const desc = t.obs || t.category || 'Sem descrição';
+                const identificacao = `${t.type.substring(0, 3).toUpperCase()}_${desc.toUpperCase().replace(/\s+/g, '_')}_${String(idx + 1).padStart(3, '0')}`;
 
                 dadosPlanilha.push([
                     identificacao,
                     dataFormatada,
                     mesNome,
                     ano,
-                    t.category,
+                    desc,
                     t.type,
                     t.amount,
                     t.obs || ''
@@ -648,13 +672,14 @@ function gerarPDFMes(offset) {
                 <tbody>
                     ${rel.itens.length > 0 ? rel.itens.map(t => {
                         const money = t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                        const obsDisplay = (t.recorrenteId || t.faturaId) ? (t.obs || "-") : "-";
                         return `
                             <tr style="border-bottom: 1px solid #eee;">
                                 <td style="padding: 8px; border: 1px solid #ddd;">${t.date}</td>
-                                <td style="padding: 8px; border: 1px solid #ddd;">${t.category}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">${t.obs || t.category || 'Sem descrição'}</td>
                                 <td style="padding: 8px; border: 1px solid #ddd; color: ${t.type === "Receita" ? "#66bb6a" : "#e53935"};">${t.type}</td>
                                 <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${money}</td>
-                                <td style="padding: 8px; border: 1px solid #ddd;">${t.obs || "-"}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">${obsDisplay}</td>
                             </tr>
                         `;
                     }).join('') : `
@@ -740,6 +765,8 @@ function mostrarRelatorio(offset) {
 //  ATUALIZAR GRÁFICO DE LINHA
 // ===============================
 function atualizarGraficoLinha(transacoes, mes, ano) {
+    if (!lineChart) return;
+    
     if (!transacoes || transacoes.length === 0) {
         lineChart.data.datasets[0].data = [0, 0, 0, 0];
         lineChart.update();
@@ -877,7 +904,6 @@ function adicionarFaturaParcelada(e) {
     gerarTransacoesFaturasParceladas();
     
     atualizarTabelaFaturas();
-    atualizarFiltros();
     updateUI(currentMonth, currentYear);
     document.getElementById('faturaForm').reset();
     const hoje = new Date();
@@ -959,7 +985,7 @@ function atualizarTabelaFaturas() {
     if (faturasParceladas.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="11" style="text-align: center; padding: 40px; color: var(--text-light);">
+                <td colspan="10" style="text-align: center; padding: 40px; color: var(--text-light);">
                     Nenhuma despesa cartão cadastrada.
                 </td>
             </tr>
@@ -971,61 +997,34 @@ function atualizarTabelaFaturas() {
         // Atualizar parcelas restantes automaticamente
         calcularParcelasRestantes(fatura);
         
-        const proximoValor = calcularProximoValor(fatura);
         const valorFormatado = fatura.valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const parcelaFormatada = fatura.valorParcela.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        const proximoValorFormatado = proximoValor.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        
         const dataFinal = fatura.dataFinal ? new Date(fatura.dataFinal).toLocaleDateString('pt-BR') : '-';
-        
-        let statusClass = '';
-        let statusText = '';
-        if (proximoValor.diasAtraso > 0) {
-            statusClass = 'expense';
-            statusText = `⚠️ ${proximoValor.diasAtraso} dias atrasado`;
-        } else {
-            statusClass = 'income';
-            statusText = '✓ Em dia';
-        }
-
-        const dataVencimentoFormatada = proximoValor.dataVencimento ? 
-            new Date(proximoValor.dataVencimento).toLocaleDateString('pt-BR') : '-';
         
         // Status da fatura (ativo/inativo)
         const statusFatura = fatura.ativa !== false ? 'Ativa' : 'Inativa';
         const statusFaturaClass = fatura.ativa !== false ? 'accent-green' : 'accent-red';
         
         tbody.innerHTML += `
-            <tr data-fatura-id="${fatura.id}" data-cartao="${fatura.cartao}" data-banco="${fatura.banco}" data-parcelas="${fatura.parcelasRestantes}" style="opacity: ${fatura.ativa !== false ? '1' : '0.6'};">
-                <td>${fatura.cartao}</td>
+            <tr style="opacity: ${fatura.ativa !== false ? '1' : '0.6'};">
+                <td style="font-weight: 600;">${fatura.cartao}</td>
                 <td>${fatura.banco}</td>
-                <td style="font-weight: 600;">${valorFormatado}</td>
+                <td style="font-weight: 600; color: var(--accent-red);">${valorFormatado}</td>
                 <td>${fatura.parcelas}x</td>
                 <td style="color: var(--accent-green); font-weight: 600;">${fatura.parcelasPagas}</td>
                 <td><strong style="color: var(--accent-red);">${fatura.parcelasRestantes}</strong></td>
                 <td>${parcelaFormatada}</td>
-                <td style="font-weight: 600;">${dataFinal}</td>
-                <td style="font-weight: 700; color: ${proximoValor.diasAtraso > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">
-                    ${proximoValorFormatado}
-                    ${proximoValor.juros > 0 ? `<br><small style="color: var(--accent-red);">(+ ${proximoValor.juros.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} juros)</small>` : ''}
-                    ${proximoValor.dataVencimento ? `<br><small style="color: var(--text-medium); font-size: 0.75rem;">Venc: ${dataVencimentoFormatada}</small>` : ''}
-                </td>
+                <td>${dataFinal}</td>
                 <td style="color: var(--${statusFaturaClass}); font-weight: 600;">${statusFatura}</td>
                 <td>
                     <button onclick="abrirModalEditarFatura(${fatura.id})" class="btn-export" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
                         <i class="fas fa-edit"></i> Editar
                     </button>
-                    <button onclick="abrirModalParcelas(${fatura.id})" class="btn-add" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
-                        <i class="fas fa-list"></i> Parcelas
-                    </button>
-                    <button onclick="marcarParcelaPaga(${fatura.id})" class="btn-add" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
-                        <i class="fas fa-check"></i> Pagar
-                    </button>
                     <button onclick="alternarStatusFatura(${fatura.id})" class="btn-export" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
                         <i class="fas fa-${fatura.ativa !== false ? 'pause' : 'play'}"></i> ${fatura.ativa !== false ? 'Desativar' : 'Ativar'}
                     </button>
                     <button onclick="removerFatura(${fatura.id})" class="btn-clear" style="padding: 6px 12px; font-size: 0.85rem;">
-                        <i class="fas fa-trash"></i>
+                        <i class="fas fa-trash"></i> Remover
                     </button>
                 </td>
             </tr>
@@ -1120,7 +1119,6 @@ function marcarParcelaPaga(faturaId) {
     salvarFaturasLocal();
     salvarLocal();
     atualizarTabelaFaturas();
-    atualizarFiltros();
     updateUI(currentMonth, currentYear);
 }
 
@@ -1228,7 +1226,6 @@ function marcarParcelaEspecifica(faturaId, numeroParcela) {
     salvarLocal();
     fecharModalParcelas();
     atualizarTabelaFaturas();
-    atualizarFiltros();
     updateUI(currentMonth, currentYear);
 }
 
@@ -1405,7 +1402,6 @@ function salvarEdicaoFatura(e, faturaId) {
     salvarLocal();
     fecharModalEditarFatura();
     atualizarTabelaFaturas();
-    atualizarFiltros();
     updateUI(currentMonth, currentYear);
 
     alert("Despesa cartão atualizada com sucesso!");
@@ -1435,7 +1431,6 @@ function alternarStatusFatura(faturaId) {
     
     salvarFaturasLocal();
     atualizarTabelaFaturas();
-    atualizarFiltros();
     updateUI(currentMonth, currentYear);
 }
 
@@ -1454,7 +1449,6 @@ function removerFatura(faturaId) {
     
     // Atualizar interface
     atualizarTabelaFaturas();
-    atualizarFiltros();
     updateUI(currentMonth, currentYear);
 }
 
@@ -1481,14 +1475,13 @@ function adicionarDespesaRecorrente(e) {
     e.preventDefault();
 
     const descricao = document.getElementById('despesaRecorrenteDescricao').value.trim();
-    const categoria = document.getElementById('despesaRecorrenteCategoria').value.trim();
     const valor = parseFloat(document.getElementById('despesaRecorrenteValor').value);
     const dia = parseInt(document.getElementById('despesaRecorrenteDia').value);
     const inicio = document.getElementById('despesaRecorrenteInicio').value;
     const termino = document.getElementById('despesaRecorrenteTermino').value;
     const obs = document.getElementById('despesaRecorrenteObs').value.trim();
 
-    if (!descricao || !categoria || isNaN(valor) || valor <= 0 || !dia || dia < 1 || dia > 31 || !inicio) {
+    if (!descricao || isNaN(valor) || valor <= 0 || !dia || dia < 1 || dia > 31 || !inicio) {
         alert("Preencha todos os campos obrigatórios corretamente!");
         return;
     }
@@ -1496,7 +1489,7 @@ function adicionarDespesaRecorrente(e) {
     const novaDespesaRecorrente = {
         id: Date.now(),
         descricao,
-        categoria,
+        categoria: descricao, // Usar descrição como categoria
         valor,
         dia,
         inicio,
@@ -1732,7 +1725,6 @@ function atualizarTabelaDespesasRecorrentes() {
         tbody.innerHTML += `
             <tr style="opacity: ${despesa.ativa ? '1' : '0.6'};">
                 <td style="font-weight: 600;">${despesa.descricao}</td>
-                <td>${despesa.categoria}</td>
                 <td style="font-weight: 600; color: var(--accent-red);">${valorFormatado}</td>
                 <td>Dia ${despesa.dia}</td>
                 <td>${dataInicio}</td>
@@ -1844,6 +1836,7 @@ function salvarEdicaoDespesaRecorrente(e, despesaId) {
 
     // Atualizar dados da despesa
     despesa.categoria = novaCategoria;
+    despesa.descricao = novaCategoria; // Manter para compatibilidade
     despesa.valor = novoValor;
     despesa.dia = novoDia;
     despesa.inicio = novoInicio;
@@ -1935,14 +1928,13 @@ function adicionarReceitaRecorrente(e) {
     e.preventDefault();
 
     const descricao = document.getElementById('receitaRecorrenteDescricao').value.trim();
-    const categoria = document.getElementById('receitaRecorrenteCategoria').value.trim();
     const valor = parseFloat(document.getElementById('receitaRecorrenteValor').value);
     const dia = parseInt(document.getElementById('receitaRecorrenteDia').value);
     const inicio = document.getElementById('receitaRecorrenteInicio').value;
     const termino = document.getElementById('receitaRecorrenteTermino').value;
     const obs = document.getElementById('receitaRecorrenteObs').value.trim();
 
-    if (!descricao || !categoria || isNaN(valor) || valor <= 0 || !dia || dia < 1 || dia > 31 || !inicio) {
+    if (!descricao || isNaN(valor) || valor <= 0 || !dia || dia < 1 || dia > 31 || !inicio) {
         alert("Preencha todos os campos obrigatórios corretamente!");
         return;
     }
@@ -1950,7 +1942,7 @@ function adicionarReceitaRecorrente(e) {
     const novaReceitaRecorrente = {
         id: Date.now(),
         descricao,
-        categoria,
+        categoria: descricao, // Usar descrição como categoria
         valor,
         dia,
         inicio,
@@ -2024,7 +2016,7 @@ function gerarTransacoesReceitasRecorrentes() {
                     id: Date.now() + Math.random(),
                     date: dataTransacaoStr,
                     type: "Receita",
-                    category: receita.categoria,
+                    category: receita.descricao,
                     amount: receita.valor,
                     obs: receita.obs || `[Recorrente] ${receita.descricao}`,
                     receitaRecorrenteId: receita.id
@@ -2047,7 +2039,7 @@ function atualizarTabelaReceitasRecorrentes() {
     if (receitasRecorrentes.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-light);">
+                <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-light);">
                     Nenhuma receita recorrente cadastrada.
                 </td>
             </tr>
@@ -2073,13 +2065,15 @@ function atualizarTabelaReceitasRecorrentes() {
         tbody.innerHTML += `
             <tr style="opacity: ${receita.ativa ? '1' : '0.6'};">
                 <td style="font-weight: 600;">${receita.descricao}</td>
-                <td>${receita.categoria}</td>
                 <td style="font-weight: 600; color: var(--accent-green);">${valorFormatado}</td>
                 <td>Dia ${receita.dia}</td>
                 <td>${dataInicio}</td>
                 <td>${dataTermino}</td>
                 <td style="color: var(--${statusClass}); font-weight: 600;">${status}</td>
                 <td>
+                    <button onclick="abrirModalEditarReceitaRecorrente(${receita.id})" class="btn-export" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
                     <button onclick="alternarStatusReceitaRecorrente(${receita.id})" class="btn-export" style="padding: 6px 12px; font-size: 0.85rem; margin-right: 5px; margin-bottom: 5px;">
                         <i class="fas fa-${receita.ativa ? 'pause' : 'play'}"></i> ${receita.ativa ? 'Desativar' : 'Ativar'}
                     </button>
@@ -2135,6 +2129,117 @@ function removerReceitaRecorrente(receitaId) {
     // Atualizar interface
     atualizarTabelaReceitasRecorrentes();
     updateUI(currentMonth, currentYear);
+}
+
+function abrirModalEditarReceitaRecorrente(receitaId) {
+    const receita = receitasRecorrentes.find(r => r.id === receitaId);
+    if (!receita) return;
+
+    const dataInicio = new Date(receita.inicio).toISOString().split('T')[0];
+    const dataTermino = receita.termino ? new Date(receita.termino).toISOString().split('T')[0] : '';
+
+    let modalHTML = `
+        <div id="modalEditarReceitaRecorrente" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 20px; padding: 30px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="color: var(--primary-blue); margin: 0;">Editar Receita Recorrente</h3>
+                    <button onclick="fecharModalEditarReceitaRecorrente()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-medium);">&times;</button>
+                </div>
+                <form id="formEditarReceitaRecorrente" onsubmit="salvarEdicaoReceitaRecorrente(event, ${receitaId})">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Descrição</label>
+                            <input type="text" id="editReceitaDescricao" value="${receita.descricao}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Valor Mensal (R$)</label>
+                            <input type="number" id="editReceitaValor" step="0.01" value="${receita.valor}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Dia do Mês</label>
+                        <input type="number" id="editReceitaDia" min="1" max="31" value="${receita.dia}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Data de Início</label>
+                            <input type="date" id="editReceitaInicio" value="${dataInicio}" required style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 500;">Data de Término (Opcional)</label>
+                            <input type="date" id="editReceitaTermino" value="${dataTermino}" style="width: 100%; padding: 14px 18px; border: 2px solid var(--gray-border); border-radius: 12px; font-size: 0.95rem;">
+                        </div>
+                    </div>
+                    <small style="color: var(--text-light); font-size: 0.8rem; display: block; margin-bottom: 20px;">
+                        Deixe a data de término em branco para receita permanente
+                    </small>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" onclick="fecharModalEditarReceitaRecorrente()" class="btn-clear">Cancelar</button>
+                        <button type="submit" class="btn-add">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+function fecharModalEditarReceitaRecorrente() {
+    const modal = document.getElementById('modalEditarReceitaRecorrente');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function salvarEdicaoReceitaRecorrente(e, receitaId) {
+    e.preventDefault();
+
+    const receita = receitasRecorrentes.find(r => r.id === receitaId);
+    if (!receita) return;
+
+    const novaDescricao = document.getElementById('editReceitaDescricao').value.trim();
+    const novoValor = parseFloat(document.getElementById('editReceitaValor').value);
+    const novoDia = parseInt(document.getElementById('editReceitaDia').value);
+    const novoInicio = document.getElementById('editReceitaInicio').value;
+    const novoTermino = document.getElementById('editReceitaTermino').value;
+
+    if (!novaDescricao || isNaN(novoValor) || novoValor <= 0 || !novoDia || novoDia < 1 || novoDia > 31 || !novoInicio) {
+        alert("Preencha todos os campos corretamente!");
+        return;
+    }
+
+    // Remover transações futuras relacionadas para regenerar com novos dados
+    const hoje = new Date();
+    transactions = transactions.filter(t => {
+        if (t.receitaRecorrenteId === receitaId) {
+            const dataTransacao = new Date(t.date);
+            return dataTransacao < hoje;
+        }
+        return true;
+    });
+
+    // Atualizar dados da receita
+    receita.descricao = novaDescricao;
+    receita.categoria = novaDescricao; // Manter para compatibilidade
+    receita.valor = novoValor;
+    receita.dia = novoDia;
+    receita.inicio = novoInicio;
+    receita.termino = novoTermino || null;
+
+    salvarReceitasRecorrentesLocal();
+    
+    // Regenerar transações com os novos dados
+    if (receita.ativa) {
+        gerarTransacoesReceitasRecorrentes();
+    }
+    
+    salvarLocal();
+    fecharModalEditarReceitaRecorrente();
+    atualizarTabelaReceitasRecorrentes();
+    updateUI(currentMonth, currentYear);
+
+    alert("Receita recorrente atualizada com sucesso!");
 }
 
 // ===============================

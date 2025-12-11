@@ -843,12 +843,15 @@
         }
 
         #faturasTable th {
-            background: var(--primary-blue);
-            color: white;
+            background: var(--bg-light);
+            color: var(--text-medium);
             font-weight: 600;
             text-align: left;
             padding: 14px;
             font-size: 0.875rem;
+            border-bottom: 2px solid var(--gray-border);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         #faturasTable td {
