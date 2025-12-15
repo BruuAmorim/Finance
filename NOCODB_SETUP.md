@@ -11,7 +11,9 @@ A tabela deve conter os seguintes campos:
 | Nome do Campo | Tipo | Descrição | Obrigatório | Observação |
 |--------------|------|-----------|-------------|------------|
 | `Email` | Email ou Text | Email do usuário (usado para identificar registros) | ✅ Sim | Deve ser único |
-| `UserId` | Text | ID único do usuário (pode ser o email ou ID do Supabase) | ✅ Sim | Deve ser único |
+| `UserId` | Text | ID único do usuário | ✅ Sim | Deve ser único |
+| `Password` | Text | Senha do usuário (para autenticação entre dispositivos) | ✅ Sim | **IMPORTANTE:** Em produção, isso deve ser criptografado! |
+| `Nome` | Text | Nome do usuário | ❌ Não | Nome completo ou apelido |
 | `FinanceData` | Long Text ou JSON | **Todos os dados financeiros em um único campo JSON** | ❌ Não | Contém: transactions, faturasParceladas, despesasRecorrentes, receitasRecorrentes |
 | `UpdatedAt` | DateTime | Data e hora da última atualização | ❌ Não | **Auto-gerado pelo NocoDB** - não enviar no payload |
 
@@ -43,7 +45,19 @@ Adicione os campos na seguinte ordem:
 - **Obrigatório**: ✅ Sim
 - **Único**: ✅ Sim
 
-#### Campo 3: FinanceData
+#### Campo 3: Password
+- **Nome**: `Password`
+- **Tipo**: `Single Line Text` ou `Password`
+- **Obrigatório**: ✅ Sim
+- **⚠️ IMPORTANTE:** Este campo armazena a senha do usuário para permitir login em qualquer dispositivo. Em produção, considere usar criptografia.
+
+#### Campo 4: Nome
+- **Nome**: `Nome`
+- **Tipo**: `Single Line Text`
+- **Obrigatório**: ❌ Não
+- **Descrição**: Nome completo ou apelido do usuário
+
+#### Campo 5: FinanceData
 - **Nome**: `FinanceData`
 - **Tipo**: `Long Text` ou `JSON`
 - **Obrigatório**: ❌ Não
@@ -59,7 +73,7 @@ Adicione os campos na seguinte ordem:
   }
   ```
 
-#### Campo 4: UpdatedAt
+#### Campo 6: UpdatedAt
 - **Nome**: `UpdatedAt`
 - **Tipo**: `DateTime`
 - **Obrigatório**: ❌ Não

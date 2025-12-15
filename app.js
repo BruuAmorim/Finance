@@ -2517,18 +2517,41 @@ async function fazerLogin() {
         return;
     }
     
-    // Sistema de autenticação usando apenas localStorage
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const user = users.find(u => u.email === email && u.password === password);
+    // Tentar buscar usuário no NocoDB primeiro (funciona em qualquer dispositivo)
+    let user = null;
+    if (USE_NOCODB) {
+        user = await buscarUsuarioNocoDB(email, password);
+    }
+    
+    // Se não encontrou no NocoDB, tentar no localStorage (fallback)
+    if (!user) {
+        const users = JSON.parse(localStorage.getItem('users') || '[]');
+        const localUser = users.find(u => u.email === email && u.password === password);
+        if (localUser) {
+            user = {
+                email: localUser.email,
+                nome: localUser.nome,
+                id: localUser.id || localUser.email
+            };
+            // Sincronizar com NocoDB para funcionar em outros dispositivos
+            await salvarUsuarioNocoDB(user.email, password, user.nome, user.id);
+        }
+    }
     
     if (user) {
-        currentUser = { 
-            email: user.email, 
-            nome: user.nome,
-            id: user.id || user.email // Usar email como ID se não houver ID
-        };
+        currentUser = user;
         isLoggedIn = true;
         localStorage.setItem('userData', JSON.stringify(currentUser));
+        // Salvar também no localStorage local para fallback
+        const users = JSON.parse(localStorage.getItem('users') || '[]');
+        const existingUserIndex = users.findIndex(u => u.email === email);
+        if (existingUserIndex >= 0) {
+            users[existingUserIndex] = { ...users[existingUserIndex], ...user, password };
+        } else {
+            users.push({ ...user, password });
+        }
+        localStorage.setItem('users', JSON.stringify(users));
+        
         atualizarUIUsuario();
         fecharModalAuth();
         await carregarDadosUsuario();
@@ -2571,10 +2594,35 @@ async function fazerCadastro() {
             return;
         }
         
-        // Sistema de autenticação usando apenas localStorage
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
+        // Verificar se email já existe no NocoDB
+        let emailExiste = false;
+        if (USE_NOCODB) {
+            const emailToSearch = encodeURIComponent(email);
+            const checkParams = new URLSearchParams({
+                offset: '0',
+                limit: '25',
+                where: `(Email,eq,${emailToSearch})`,
+                viewId: NOCODB_VIEW_ID
+            });
+            const checkUrl = `${NOCODB_BASE_URL}?${checkParams.toString()}`;
+            const checkResponse = await fetch(checkUrl, {
+                method: 'GET',
+                headers: {
+                    'xc-token': NOCODB_API_TOKEN,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (checkResponse.ok) {
+                const checkData = await checkResponse.json();
+                const existingRecords = checkData.list || checkData.records || [];
+                emailExiste = existingRecords.length > 0;
+            }
+        }
         
-        if (users.find(u => u.email === email)) {
+        // Verificar também no localStorage local
+        const users = JSON.parse(localStorage.getItem('users') || '[]');
+        if (emailExiste || users.find(u => u.email === email)) {
             mostrarErro('Este email já está cadastrado!');
             return;
         }
@@ -2586,6 +2634,15 @@ async function fazerCadastro() {
             password: password // Em produção, isso deve ser criptografado!
         };
         
+        // Salvar no NocoDB primeiro (para funcionar em qualquer dispositivo)
+        if (USE_NOCODB) {
+            const sucessoNoco = await salvarUsuarioNocoDB(newUser.email, newUser.password, newUser.nome, newUser.id);
+            if (!sucessoNoco) {
+                console.warn('Aviso: Não foi possível salvar no NocoDB, mas o cadastro local foi realizado.');
+            }
+        }
+        
+        // Salvar também no localStorage local (fallback)
         users.push(newUser);
         localStorage.setItem('users', JSON.stringify(users));
         
@@ -2599,9 +2656,7 @@ async function fazerCadastro() {
         atualizarUIUsuario();
         fecharModalAuth();
         
-        // Opcional: o usuário poderá salvar na nuvem manualmente pelo botão "Salvar na nuvem"
-        
-        alert('Cadastro realizado com sucesso!');
+        alert('Cadastro realizado com sucesso! Agora você pode fazer login em qualquer dispositivo.');
     } catch (error) {
         console.error('Erro em fazerCadastro:', error);
         mostrarErro('Ocorreu um erro ao processar o cadastro: ' + (error.message || 'Erro desconhecido'));
@@ -2653,6 +2708,162 @@ async function logout() {
 // ===============================
 //  SINCRONIZAÇÃO DE DADOS - NOCODB
 // ===============================
+
+// Função para salvar usuário no NocoDB (para autenticação entre dispositivos)
+async function salvarUsuarioNocoDB(email, password, nome, userId) {
+    if (!USE_NOCODB) return false;
+    
+    try {
+        const recordData = {
+            Email: email || '',
+            UserId: userId || email || '',
+            Password: password, // Em produção, isso deve ser criptografado!
+            Nome: nome || 'Usuário',
+            FinanceData: JSON.stringify({
+                transactions: [],
+                faturasParceladas: [],
+                despesasRecorrentes: [],
+                receitasRecorrentes: [],
+                updated_at: new Date().toISOString()
+            })
+        };
+
+        // Verificar se já existe um registro com este email
+        const emailToSearch = encodeURIComponent(email || '');
+        const checkParams = new URLSearchParams({
+            offset: '0',
+            limit: '25',
+            where: `(Email,eq,${emailToSearch})`,
+            viewId: NOCODB_VIEW_ID
+        });
+        const checkUrl = `${NOCODB_BASE_URL}?${checkParams.toString()}`;
+        
+        const checkResponse = await fetch(checkUrl, {
+            method: 'GET',
+            headers: {
+                'xc-token': NOCODB_API_TOKEN,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (checkResponse.ok) {
+            const checkData = await checkResponse.json();
+            const existingRecords = checkData.list || checkData.records || [];
+            
+            if (existingRecords.length > 0) {
+                // Atualizar registro existente (atualizar senha/nome)
+                const recordId = existingRecords[0].Id || existingRecords[0].id || existingRecords[0]._id;
+                const updateUrl = `${NOCODB_BASE_URL}/${recordId}`;
+                
+                const updateResponse = await fetch(updateUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'xc-token': NOCODB_API_TOKEN,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        Password: password,
+                        Nome: nome || 'Usuário',
+                        UserId: userId || email
+                    })
+                });
+
+                if (updateResponse.ok) {
+                    console.log('✅ Usuário atualizado com sucesso no NocoDB');
+                    return true;
+                } else {
+                    const errorText = await updateResponse.text();
+                    console.error('❌ Erro ao atualizar usuário no NocoDB:', errorText);
+                    return false;
+                }
+            } else {
+                // Criar novo registro
+                const createParams = new URLSearchParams({
+                    offset: '0',
+                    limit: '25',
+                    where: '',
+                    viewId: NOCODB_VIEW_ID
+                });
+                const createUrl = `${NOCODB_BASE_URL}?${createParams.toString()}`;
+                const createResponse = await fetch(createUrl, {
+                    method: 'POST',
+                    headers: {
+                        'xc-token': NOCODB_API_TOKEN,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(recordData)
+                });
+
+                if (createResponse.ok) {
+                    console.log('✅ Usuário criado com sucesso no NocoDB');
+                    return true;
+                } else {
+                    const errorText = await createResponse.text();
+                    console.error('❌ Erro ao criar usuário no NocoDB:', errorText);
+                    return false;
+                }
+            }
+        } else {
+            console.error('❌ Erro ao verificar usuário no NocoDB');
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Erro ao salvar usuário no NocoDB:', error);
+        return false;
+    }
+}
+
+// Função para buscar usuário no NocoDB (para login entre dispositivos)
+async function buscarUsuarioNocoDB(email, password) {
+    if (!USE_NOCODB) return null;
+    
+    try {
+        const emailToSearch = encodeURIComponent(email || '');
+        const params = new URLSearchParams({
+            offset: '0',
+            limit: '25',
+            where: `(Email,eq,${emailToSearch})`,
+            viewId: NOCODB_VIEW_ID
+        });
+        const url = `${NOCODB_BASE_URL}?${params.toString()}`;
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'xc-token': NOCODB_API_TOKEN,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const records = data.list || data.records || [];
+            
+            if (records.length > 0) {
+                const record = records[0];
+                const recordPassword = record.Password || record.password;
+                const recordNome = record.Nome || record.nome || email;
+                const recordUserId = record.UserId || record.userId || record.Id || email;
+                
+                // Verificar senha
+                if (recordPassword === password) {
+                    return {
+                        email: email,
+                        nome: recordNome,
+                        id: recordUserId
+                    };
+                } else {
+                    return null; // Senha incorreta
+                }
+            }
+        } else {
+            console.error('❌ Erro ao buscar usuário no NocoDB:', await response.text());
+        }
+    } catch (error) {
+        console.error('❌ Erro ao buscar usuário no NocoDB:', error);
+    }
+    
+    return null;
+}
 
 // Função para salvar dados no NocoDB
 // Estrutura salva em um único campo JSON (FinanceData) por usuário (Email/UserId)
