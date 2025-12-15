@@ -2636,9 +2636,14 @@ async function fazerCadastro() {
         
         // Salvar no NocoDB primeiro (para funcionar em qualquer dispositivo)
         if (USE_NOCODB) {
+            console.log('🔄 Tentando salvar usuário no NocoDB...', { email: newUser.email, nome: newUser.nome });
             const sucessoNoco = await salvarUsuarioNocoDB(newUser.email, newUser.password, newUser.nome, newUser.id);
             if (!sucessoNoco) {
-                console.warn('Aviso: Não foi possível salvar no NocoDB, mas o cadastro local foi realizado.');
+                console.error('❌ Falha ao salvar no NocoDB. Verifique o console para mais detalhes.');
+                mostrarErro('Não foi possível salvar no NocoDB. Verifique se os campos Password e Nome existem na tabela. O cadastro local foi realizado.');
+                // Continuar mesmo se falhar no NocoDB
+            } else {
+                console.log('✅ Usuário salvo com sucesso no NocoDB!');
             }
         }
         
@@ -2795,16 +2800,27 @@ async function salvarUsuarioNocoDB(email, password, nome, userId) {
                 });
 
                 if (createResponse.ok) {
+                    const responseData = await createResponse.json();
                     console.log('✅ Usuário criado com sucesso no NocoDB');
+                    console.log('Resposta do NocoDB:', responseData);
                     return true;
                 } else {
                     const errorText = await createResponse.text();
-                    console.error('❌ Erro ao criar usuário no NocoDB:', errorText);
+                    console.error('❌ Erro ao criar usuário no NocoDB');
+                    console.error('Status HTTP:', createResponse.status, createResponse.statusText);
+                    console.error('Resposta completa:', errorText);
+                    console.error('URL da requisição:', createUrl);
+                    console.error('Dados enviados:', JSON.stringify(recordData, null, 2));
+                    console.error('⚠️ VERIFIQUE: Os campos Password e Nome existem na tabela do NocoDB?');
                     return false;
                 }
             }
         } else {
+            const errorText = await checkResponse.text();
             console.error('❌ Erro ao verificar usuário no NocoDB');
+            console.error('Status:', checkResponse.status);
+            console.error('Resposta:', errorText);
+            console.error('URL:', checkUrl);
             return false;
         }
     } catch (error) {
