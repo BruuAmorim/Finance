@@ -12,60 +12,15 @@ let isLoggedIn = false;
 let currentAuthForm = 'login'; // 'login' ou 'cadastro'
 
 // ===============================
-//  CONFIGURAÇÃO DO SUPABASE
+//  CONFIGURAÇÃO DO NOCODB
 // ===============================
-const SUPABASE_URL = 'https://ffpmfqqvxeuvjcgyjsen.supabase.co';
-// Chave anon do Supabase
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmcG1mcXF2eGV1dmpjZ3lqc2VuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0NzE5OTgsImV4cCI6MjA4MTA0Nzk5OH0.XfcdBtF7aUnrsbDA_A4DEuX6KOvgOOa9bVvV2unYmJg';
-
-// Inicializar cliente Supabase
-let supabase = null;
-let USE_SUPABASE = false;
-let supabaseInicializado = false; // Flag para evitar múltiplas inicializações
-
-// Função para inicializar Supabase quando a biblioteca estiver carregada
-function inicializarSupabase() {
-    // Evitar múltiplas inicializações
-    if (supabaseInicializado && supabase) {
-        console.log('Supabase já inicializado, reutilizando instância existente.');
-        return true;
-    }
-    
-    try {
-        // Verificar se a biblioteca Supabase está disponível
-        if (typeof window !== 'undefined') {
-            // Tentar diferentes formas de acessar a biblioteca
-            let supabaseLib = null;
-            
-            if (window.supabase && window.supabase.createClient) {
-                supabaseLib = window.supabase;
-            } else if (window.supabaseClient) {
-                supabaseLib = window.supabaseClient;
-            } else if (typeof supabase !== 'undefined' && supabase.createClient) {
-                supabaseLib = supabase;
-            }
-            
-            if (supabaseLib) {
-                // Criar apenas uma instância
-                if (!supabase) {
-                    supabase = supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                    USE_SUPABASE = true;
-                    supabaseInicializado = true;
-                    console.log('✅ Supabase inicializado com sucesso!');
-                    console.log('URL:', SUPABASE_URL);
-                }
-                return true;
-            } else {
-                console.warn('⚠️ Biblioteca Supabase não encontrada. Verifique se o script foi carregado.');
-                return false;
-            }
-        }
-    } catch (e) {
-        console.error('❌ Erro ao inicializar Supabase:', e);
-        console.warn('Usando localStorage como fallback.');
-        return false;
-    }
-}
+// URL oficial informada:
+// https://app.nocodb.com/api/v2/tables/mht7b7fomr6g2it/records?offset=0&limit=25&where=&viewId=vwp00extw4gab91s
+// Usaremos a parte base + construímos os parâmetros via URLSearchParams.
+const NOCODB_API_TOKEN = 'YXvXeKm4xqldUZIZxtwt8tslZxStu08SqXr2mOs_';
+const NOCODB_BASE_URL = 'https://app.nocodb.com/api/v2/tables/mht7b7fomr6g2it/records';
+const NOCODB_VIEW_ID = 'vwp00extw4gab91s';
+let USE_NOCODB = true; // Flag para habilitar/desabilitar NocoDB
 
 // ===============================
 //  CARREGAR DO LOCALSTORAGE
@@ -115,18 +70,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (faturaDiaPagamento) {
         faturaDiaPagamento.value = 10;
     }
-    // Inicializar Supabase primeiro (antes de verificar login)
-    inicializarSupabase();
-    
-    // Aguardar um pouco para garantir que Supabase está pronto
-    setTimeout(() => {
-        // Verificar se usuário está logado
-        verificarLogin();
-        atualizarUIUsuario();
-    }, 100);
-    
-    // Inicializar Supabase
-    inicializarSupabase();
+    // Verificar se usuário está logado
+    verificarLogin();
+    atualizarUIUsuario();
     
     initCharts();
     
@@ -184,10 +130,8 @@ document.addEventListener("DOMContentLoaded", () => {
 //  SALVAR NO LOCALSTORAGE
 // ===============================
 function salvarLocal() {
+    // Salva apenas localmente; envio para o NocoDB agora é manual (botão "Salvar na nuvem")
     localStorage.setItem("transactions", JSON.stringify(transactions));
-    if (isLoggedIn) {
-        salvarDadosUsuario();
-    }
 }
 
 // ===============================
@@ -918,10 +862,8 @@ function atualizarGraficoLinha(transacoes, mes, ano) {
 // ===============================
 
 function salvarFaturasLocal() {
+    // Salva apenas localmente; sincronização com NocoDB é manual
     localStorage.setItem("faturasParceladas", JSON.stringify(faturasParceladas));
-    if (isLoggedIn) {
-        salvarDadosUsuario();
-    }
 }
 
 function toggleFaturaForm() {
@@ -1568,10 +1510,8 @@ function removerFatura(faturaId) {
 // ===============================
 
 function salvarDespesasRecorrentesLocal() {
+    // Salva apenas localmente; sincronização com NocoDB é manual
     localStorage.setItem("despesasRecorrentes", JSON.stringify(despesasRecorrentes));
-    if (isLoggedIn) {
-        salvarDadosUsuario();
-    }
 }
 
 function toggleDespesaRecorrenteForm() {
@@ -2024,10 +1964,8 @@ function removerDespesaRecorrente(despesaId) {
 // ===============================
 
 function salvarReceitasRecorrentesLocal() {
+    // Salva apenas localmente; sincronização com NocoDB é manual
     localStorage.setItem("receitasRecorrentes", JSON.stringify(receitasRecorrentes));
-    if (isLoggedIn) {
-        salvarDadosUsuario();
-    }
 }
 
 function toggleReceitaRecorrenteForm() {
@@ -2422,28 +2360,8 @@ function carregarModoEscuro() {
 // Verificar login será chamado no DOMContentLoaded principal
 
 async function verificarLogin() {
-    if (USE_SUPABASE && supabase) {
-        try {
-            // Verificar sessão do Supabase
-            const { data: { session }, error } = await supabase.auth.getSession();
-            if (session && session.user) {
-                currentUser = {
-                    email: session.user.email,
-                    nome: session.user.user_metadata?.nome || session.user.email,
-                    id: session.user.id
-                };
-                isLoggedIn = true;
-                atualizarUIUsuario();
-                await carregarDadosUsuario();
-            }
-        } catch (e) {
-            console.error('Erro ao verificar sessão Supabase:', e);
-            // Fallback para localStorage
-            verificarLoginLocalStorage();
-        }
-    } else {
-        verificarLoginLocalStorage();
-    }
+    // Sistema de autenticação simplificado usando apenas localStorage
+    verificarLoginLocalStorage();
 }
 
 function verificarLoginLocalStorage() {
@@ -2460,30 +2378,6 @@ function verificarLoginLocalStorage() {
     }
 }
 
-async function verificarTokenBackend(token) {
-    try {
-        const response = await fetch(`${API_URL}/verify-token`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            currentUser = data.user;
-            isLoggedIn = true;
-            atualizarUIUsuario();
-            carregarDadosUsuario();
-        } else {
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('userData');
-        }
-    } catch (error) {
-        console.error('Erro ao verificar token:', error);
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('userData');
-    }
-}
 
 function atualizarUIUsuario() {
     const userEmailEl = document.getElementById('userEmail');
@@ -2602,51 +2496,24 @@ async function fazerLogin() {
         return;
     }
     
-    if (USE_SUPABASE && supabase) {
-        try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email: email,
-                password: password
-            });
-            
-            if (error) {
-                mostrarErro(error.message || 'Email ou senha incorretos!');
-                return;
-            }
-            
-            if (data.user) {
-                currentUser = {
-                    email: data.user.email,
-                    nome: data.user.user_metadata?.nome || data.user.email,
-                    id: data.user.id
-                };
-                isLoggedIn = true;
-                localStorage.setItem('userData', JSON.stringify(currentUser));
-                atualizarUIUsuario();
-                fecharModalAuth();
-                await carregarDadosUsuario();
-                alert('Login realizado com sucesso!');
-            }
-        } catch (error) {
-            console.error('Erro no login:', error);
-            mostrarErro('Erro ao fazer login. Tente novamente.');
-        }
+    // Sistema de autenticação usando apenas localStorage
+    const users = JSON.parse(localStorage.getItem('users') || '[]');
+    const user = users.find(u => u.email === email && u.password === password);
+    
+    if (user) {
+        currentUser = { 
+            email: user.email, 
+            nome: user.nome,
+            id: user.id || user.email // Usar email como ID se não houver ID
+        };
+        isLoggedIn = true;
+        localStorage.setItem('userData', JSON.stringify(currentUser));
+        atualizarUIUsuario();
+        fecharModalAuth();
+        await carregarDadosUsuario();
+        alert('Login realizado com sucesso!');
     } else {
-        // Fallback para localStorage
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        const user = users.find(u => u.email === email && u.password === password);
-        
-        if (user) {
-            currentUser = { email: user.email, nome: user.nome };
-            isLoggedIn = true;
-            localStorage.setItem('userData', JSON.stringify(currentUser));
-            atualizarUIUsuario();
-            fecharModalAuth();
-            carregarDadosUsuario();
-            alert('Login realizado com sucesso!');
-        } else {
-            mostrarErro('Email ou senha incorretos!');
-        }
+        mostrarErro('Email ou senha incorretos!');
     }
 }
 
@@ -2683,113 +2550,37 @@ async function fazerCadastro() {
             return;
         }
         
-        // Verificar novamente se Supabase está disponível
-        if (!USE_SUPABASE || !supabase) {
-            console.warn('Supabase não disponível, tentando inicializar...');
-            inicializarSupabase();
+        // Sistema de autenticação usando apenas localStorage
+        const users = JSON.parse(localStorage.getItem('users') || '[]');
+        
+        if (users.find(u => u.email === email)) {
+            mostrarErro('Este email já está cadastrado!');
+            return;
         }
         
-        if (USE_SUPABASE && supabase) {
-            try {
-                console.log('Tentando cadastrar usuário no Supabase...');
-                console.log('Email:', email);
-                
-                // Cadastrar usuário no Supabase
-                const { data, error } = await supabase.auth.signUp({
-                    email: email,
-                    password: password,
-                    options: {
-                        data: {
-                            nome: nome || 'Usuário'
-                        }
-                    }
-                });
-                
-                console.log('Resposta do Supabase:', { data, error });
-                
-                if (error) {
-                    console.error('Erro do Supabase:', error);
-                    mostrarErro(error.message || 'Erro ao cadastrar!');
-                    return;
-                }
-                
-                if (data && data.user) {
-                    currentUser = {
-                        email: data.user.email,
-                        nome: nome || 'Usuário',
-                        id: data.user.id
-                    };
-                    isLoggedIn = true;
-                    localStorage.setItem('userData', JSON.stringify(currentUser));
-                    atualizarUIUsuario();
-                    
-                    // Criar registro inicial na tabela user_data usando INSERT direto
-                    // A política RLS permitirá se auth.uid() = user_id
-                    try {
-                        const { error: createError } = await supabase
-                            .from('user_data')
-                            .insert({
-                                user_id: data.user.id,
-                                transactions: [],
-                                faturas_parceladas: [],
-                                despesas_recorrentes: [],
-                                receitas_recorrentes: [],
-                                updated_at: new Date().toISOString()
-                            });
-                        
-                        if (createError) {
-                            console.warn('Aviso ao criar dados iniciais:', createError);
-                            // Não bloquear o cadastro se falhar, tentar salvar depois
-                        } else {
-                            console.log('Registro inicial criado com sucesso');
-                        }
-                    } catch (insertError) {
-                        console.warn('Erro ao criar registro inicial:', insertError);
-                    }
-                    
-                    fecharModalAuth();
-                    
-                    // Tentar salvar dados após um pequeno delay para garantir que a sessão está ativa
-                    setTimeout(async () => {
-                        await salvarDadosUsuario();
-                    }, 500);
-                    
-                    alert('Cadastro realizado com sucesso! Verifique seu email para confirmar a conta.');
-                } else {
-                    console.warn('Nenhum usuário retornado do Supabase');
-                    mostrarErro('Erro ao criar usuário. Tente novamente.');
-                }
-            } catch (error) {
-                console.error('Erro no cadastro:', error);
-                mostrarErro('Erro ao cadastrar: ' + (error.message || 'Erro desconhecido'));
-            }
-        } else {
-            // Fallback para localStorage
-            const users = JSON.parse(localStorage.getItem('users') || '[]');
-            
-            if (users.find(u => u.email === email)) {
-                mostrarErro('Este email já está cadastrado!');
-                return;
-            }
-            
-            const newUser = {
-                id: Date.now(),
-                nome: nome || 'Usuário',
-                email,
-                password: password // Em produção, isso deve ser criptografado!
-            };
-            
-            users.push(newUser);
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            currentUser = { email: newUser.email, nome: newUser.nome };
-            isLoggedIn = true;
-            localStorage.setItem('userData', JSON.stringify(currentUser));
-            atualizarUIUsuario();
-            fecharModalAuth();
-            salvarDadosUsuario();
-            alert('Cadastro realizado com sucesso!');
-        }
+        const newUser = {
+            id: Date.now().toString(), // ID único baseado em timestamp
+            nome: nome || 'Usuário',
+            email,
+            password: password // Em produção, isso deve ser criptografado!
+        };
+        
+        users.push(newUser);
+        localStorage.setItem('users', JSON.stringify(users));
+        
+        currentUser = { 
+            email: newUser.email, 
+            nome: newUser.nome,
+            id: newUser.id
+        };
+        isLoggedIn = true;
+        localStorage.setItem('userData', JSON.stringify(currentUser));
+        atualizarUIUsuario();
+        fecharModalAuth();
+        
+        // Opcional: o usuário poderá salvar na nuvem manualmente pelo botão "Salvar na nuvem"
+        
+        alert('Cadastro realizado com sucesso!');
     } catch (error) {
         console.error('Erro em fazerCadastro:', error);
         mostrarErro('Ocorreu um erro ao processar o cadastro: ' + (error.message || 'Erro desconhecido'));
@@ -2809,14 +2600,6 @@ function mostrarErro(mensagem) {
 
 async function logout() {
     if (confirm('Deseja realmente sair? Seus dados locais serão mantidos.')) {
-        if (USE_SUPABASE && supabase) {
-            try {
-                await supabase.auth.signOut();
-            } catch (error) {
-                console.error('Erro ao fazer logout:', error);
-            }
-        }
-        
         currentUser = null;
         isLoggedIn = false;
         localStorage.removeItem('userData');
@@ -2824,6 +2607,190 @@ async function logout() {
         atualizarUIUsuario();
         alert('Logout realizado com sucesso!');
     }
+}
+
+// ===============================
+//  SINCRONIZAÇÃO DE DADOS - NOCODB
+// ===============================
+
+// Função para salvar dados no NocoDB
+// Estrutura salva em um único campo JSON (FinanceData) por usuário (Email/UserId)
+async function salvarDadosNocoDB(dadosUsuario) {
+    if (!USE_NOCODB || !currentUser) return false;
+    
+    try {
+        // Objeto completo com todos os dados financeiros
+        const financeData = {
+            transactions: dadosUsuario.transactions || [],
+            faturasParceladas: dadosUsuario.faturasParceladas || [],
+            despesasRecorrentes: dadosUsuario.despesasRecorrentes || [],
+            receitasRecorrentes: dadosUsuario.receitasRecorrentes || [],
+            updated_at: dadosUsuario.updated_at || new Date().toISOString()
+        };
+
+        // Preparar dados para o formato do NocoDB
+        // IMPORTANTE: criar no NocoDB os campos:
+        // - Email (texto ou email, único)
+        // - UserId (texto, único)
+        // - FinanceData (Long Text ou JSON)
+        // - UpdatedAt (DateTime - auto-gerado pelo NocoDB, NÃO enviar no payload)
+        const recordData = {
+            Email: currentUser.email || '',
+            UserId: currentUser.id || currentUser.email || '',
+            FinanceData: JSON.stringify(financeData)
+            // UpdatedAt é removido - o NocoDB gerencia automaticamente este campo
+        };
+
+        // Primeiro, verificar se já existe um registro com este email/userId
+        // Tentar diferentes formatos de query
+        const emailToSearch = encodeURIComponent(currentUser.email || '');
+        const checkParams = new URLSearchParams({
+            offset: '0',
+            limit: '25',
+            where: `(Email,eq,${emailToSearch})`,
+            viewId: NOCODB_VIEW_ID
+        });
+        const checkUrl = `${NOCODB_BASE_URL}?${checkParams.toString()}`;
+        
+        const checkResponse = await fetch(checkUrl, {
+            method: 'GET',
+            headers: {
+                'xc-token': NOCODB_API_TOKEN,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (checkResponse.ok) {
+            const checkData = await checkResponse.json();
+            const existingRecords = checkData.list || checkData.records || [];
+            
+            if (existingRecords.length > 0) {
+                // Atualizar registro existente
+                // O ID pode estar em diferentes campos (Id, id, _id, etc)
+                const recordId = existingRecords[0].Id || existingRecords[0].id || existingRecords[0]._id || existingRecords[0].Id;
+                const updateUrl = `${NOCODB_BASE_URL}/${recordId}`;
+                
+                const updateResponse = await fetch(updateUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'xc-token': NOCODB_API_TOKEN,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(recordData)
+                });
+
+                if (updateResponse.ok) {
+                    console.log('✅ Dados atualizados com sucesso no NocoDB');
+                    return true;
+                } else {
+                    const errorText = await updateResponse.text();
+                    console.error('❌ Erro ao atualizar dados no NocoDB:', errorText);
+                    console.error('URL:', updateUrl);
+                    console.error('Dados enviados:', recordData);
+                    return false;
+                }
+            } else {
+                // Criar novo registro
+                const createParams = new URLSearchParams({
+                    offset: '0',
+                    limit: '25',
+                    where: '',
+                    viewId: NOCODB_VIEW_ID
+                });
+                const createUrl = `${NOCODB_BASE_URL}?${createParams.toString()}`;
+                const createResponse = await fetch(createUrl, {
+                    method: 'POST',
+                    headers: {
+                        'xc-token': NOCODB_API_TOKEN,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(recordData)
+                });
+
+                if (createResponse.ok) {
+                    console.log('✅ Dados criados com sucesso no NocoDB');
+                    return true;
+                } else {
+                    const errorText = await createResponse.text();
+                    console.error('❌ Erro ao criar dados no NocoDB:', errorText);
+                    console.error('URL:', createUrl);
+                    console.error('Dados enviados:', recordData);
+                    return false;
+                }
+            }
+        } else {
+            const errorText = await checkResponse.text();
+            console.error('❌ Erro ao verificar registros no NocoDB:', errorText);
+            console.error('URL:', checkUrl);
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Erro ao salvar dados no NocoDB:', error);
+        return false;
+    }
+}
+
+// Função para carregar dados do NocoDB
+// Lê todos os dados financeiros de um único campo JSON (FinanceData)
+async function carregarDadosNocoDB() {
+    if (!USE_NOCODB || !isLoggedIn || !currentUser) return null;
+    
+    try {
+        const emailToSearch = encodeURIComponent(currentUser.email || '');
+        const params = new URLSearchParams({
+            offset: '0',
+            limit: '25',
+            where: `(Email,eq,${emailToSearch})`,
+            viewId: NOCODB_VIEW_ID
+        });
+        const url = `${NOCODB_BASE_URL}?${params.toString()}`;
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'xc-token': NOCODB_API_TOKEN,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const records = data.list || data.records || [];
+            
+            if (records.length > 0) {
+                const record = records[0];
+                // Campo principal de dados financeiros
+                const financeField = record.FinanceData || record.financedata || record.financeData;
+
+                if (financeField) {
+                    const parsed = typeof financeField === 'string' ? JSON.parse(financeField) : financeField;
+                    return {
+                        transactions: parsed.transactions || [],
+                        faturasParceladas: parsed.faturasParceladas || [],
+                        despesasRecorrentes: parsed.despesasRecorrentes || [],
+                        receitasRecorrentes: parsed.receitasRecorrentes || []
+                    };
+                } else {
+                    console.log('ℹ️ Registro no NocoDB encontrado, mas campo FinanceData está vazio.');
+                    return {
+                        transactions: [],
+                        faturasParceladas: [],
+                        despesasRecorrentes: [],
+                        receitasRecorrentes: []
+                    };
+                }
+            } else {
+                console.log('ℹ️ Nenhum registro encontrado no NocoDB para este usuário');
+            }
+        } else {
+            const errorText = await response.text();
+            console.error('❌ Erro ao carregar dados do NocoDB:', errorText);
+            console.error('URL:', url);
+        }
+    } catch (error) {
+        console.error('❌ Erro ao carregar dados do NocoDB:', error);
+    }
+    
+    return null;
 }
 
 // ===============================
@@ -2842,116 +2809,69 @@ async function salvarDadosUsuario() {
         updated_at: new Date().toISOString()
     };
     
-    if (USE_SUPABASE && supabase) {
-        try {
-            // Verificar se o registro já existe
-            const { data: existingData, error: checkError } = await supabase
-                .from('user_data')
-                .select('user_id')
-                .eq('user_id', currentUser.id)
-                .single();
-            
-            // Se não existir, criar primeiro usando INSERT direto
-            if (checkError && checkError.code === 'PGRST116') {
-                console.log('Registro não existe, criando...');
-                const { error: createError } = await supabase
-                    .from('user_data')
-                    .insert({
-                        user_id: currentUser.id,
-                        transactions: [],
-                        faturas_parceladas: [],
-                        despesas_recorrentes: [],
-                        receitas_recorrentes: [],
-                        updated_at: new Date().toISOString()
-                    });
-                
-                if (createError) {
-                    console.error('Erro ao criar registro inicial:', createError);
-                    // Fallback para localStorage
-                    localStorage.setItem(`userData_${currentUser.email}`, JSON.stringify(dadosUsuario));
-                    return;
-                }
-            }
-            
-            // Agora fazer o upsert
-            const { error } = await supabase
-                .from('user_data')
-                .upsert({
-                    user_id: currentUser.id,
-                    transactions: dadosUsuario.transactions,
-                    faturas_parceladas: dadosUsuario.faturasParceladas,
-                    despesas_recorrentes: dadosUsuario.despesasRecorrentes,
-                    receitas_recorrentes: dadosUsuario.receitasRecorrentes,
-                    updated_at: dadosUsuario.updated_at
-                }, {
-                    onConflict: 'user_id'
-                });
-            
-            if (error) {
-                console.error('Erro ao salvar dados no Supabase:', error);
-                // Fallback para localStorage
-                localStorage.setItem(`userData_${currentUser.email}`, JSON.stringify(dadosUsuario));
-            } else {
-                console.log('Dados salvos com sucesso no Supabase');
-            }
-        } catch (error) {
-            console.error('Erro ao salvar dados:', error);
-            // Fallback para localStorage
-            localStorage.setItem(`userData_${currentUser.email}`, JSON.stringify(dadosUsuario));
+    // Salvar no NocoDB (backend principal)
+    let sucessoNoco = false;
+    if (USE_NOCODB) {
+        sucessoNoco = await salvarDadosNocoDB(dadosUsuario);
+    }
+    
+    // Sempre manter uma cópia no localStorage (por usuário) como backup
+    localStorage.setItem(`userData_${currentUser.email}`, JSON.stringify(dadosUsuario));
+
+    return sucessoNoco;
+}
+
+// Função chamada pelo botão "Salvar na nuvem"
+async function sincronizarDadosNuvem() {
+    if (!isLoggedIn || !currentUser) {
+        alert('Faça login para salvar seus dados na nuvem.');
+        return;
+    }
+    
+    try {
+        const sucesso = await salvarDadosUsuario();
+        if (sucesso) {
+            alert('Dados salvos na nuvem com sucesso!');
+        } else {
+            alert('Não foi possível salvar na nuvem agora. Seus dados continuam salvos neste dispositivo.');
         }
-    } else {
-        // Salvar no localStorage com prefixo do usuário
-        localStorage.setItem(`userData_${currentUser.email}`, JSON.stringify(dadosUsuario));
+    } catch (error) {
+        console.error('Erro ao sincronizar com a nuvem:', error);
+        alert('Erro ao salvar na nuvem. Tente novamente mais tarde.');
     }
 }
 
 async function carregarDadosUsuario() {
     if (!isLoggedIn || !currentUser) return;
     
-    if (USE_SUPABASE && supabase) {
-        try {
-            // Carregar do Supabase
-            const { data, error } = await supabase
-                .from('user_data')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .single();
+    // Tentar carregar do NocoDB primeiro (backend principal)
+    if (USE_NOCODB) {
+        const dadosNocoDB = await carregarDadosNocoDB();
+        if (dadosNocoDB) {
+            transactions = dadosNocoDB.transactions || [];
+            faturasParceladas = dadosNocoDB.faturasParceladas || [];
+            despesasRecorrentes = dadosNocoDB.despesasRecorrentes || [];
+            receitasRecorrentes = dadosNocoDB.receitasRecorrentes || [];
             
-            if (error && error.code !== 'PGRST116') { // PGRST116 = nenhuma linha encontrada
-                console.error('Erro ao carregar dados do Supabase:', error);
-                // Tentar carregar do localStorage como fallback
-                carregarDadosLocalStorage();
-                return;
-            }
+            // Atualizar localStorage padrão
+            salvarLocal();
+            salvarFaturasLocal();
+            salvarDespesasRecorrentesLocal();
+            salvarReceitasRecorrentesLocal();
             
-            if (data) {
-                transactions = data.transactions || [];
-                faturasParceladas = data.faturas_parceladas || [];
-                despesasRecorrentes = data.despesas_recorrentes || [];
-                receitasRecorrentes = data.receitas_recorrentes || [];
-                
-                // Atualizar localStorage padrão
-                salvarLocal();
-                salvarFaturasLocal();
-                salvarDespesasRecorrentesLocal();
-                salvarReceitasRecorrentesLocal();
-                
-                // Atualizar UI
-                updateUI(currentMonth, currentYear);
-                atualizarTabelaFaturas();
-                atualizarTabelaDespesasRecorrentes();
-                atualizarTabelaReceitasRecorrentes();
-            } else {
-                // Se não houver dados no Supabase, tentar localStorage
-                carregarDadosLocalStorage();
-            }
-        } catch (error) {
-            console.error('Erro ao carregar dados:', error);
-            carregarDadosLocalStorage();
+            // Atualizar UI
+            updateUI(currentMonth, currentYear);
+            atualizarTabelaFaturas();
+            atualizarTabelaDespesasRecorrentes();
+            atualizarTabelaReceitasRecorrentes();
+            
+            console.log('✅ Dados carregados do NocoDB');
+            return;
         }
-    } else {
-        carregarDadosLocalStorage();
     }
+
+    // Fallback: carregar do localStorage (por usuário)
+    carregarDadosLocalStorage();
 }
 
 function carregarDadosLocalStorage() {

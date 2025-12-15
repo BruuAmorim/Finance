@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Conexão NocoDB - EvaCloudd Finance</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #0d47a1;
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            border-left: 4px solid #0d47a1;
+        }
+        button {
+            background: #0d47a1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #1565c0;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .success {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            color: #2e7d32;
+        }
+        .error {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            color: #c62828;
+        }
+        .info {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            color: #1565c0;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: 600;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Teste de Conexão NocoDB</h1>
+        <p>Use esta página para testar a conexão e configuração do NocoDB.</p>
+
+        <div class="test-section">
+            <h3>1. Configuração</h3>
+            <label>Token da API:</label>
+            <input type="text" id="token" value="YXvXeKm4xqldUZIZxtwt8tslZxStu08SqXr2mOs_" placeholder="Cole seu token da API aqui">
+            
+            <label>URL da Tabela:</label>
+            <!-- Usar a URL base sem parâmetros fixos; os parâmetros serão montados via URLSearchParams -->
+            <input type="text" id="url" value="https://app.nocodb.com/api/v2/tables/mht7b7fomr6g2it/records" placeholder="URL completa da tabela">
+            
+            <label>View ID (opcional):</label>
+            <input type="text" id="viewId" value="vwp00extw4gab91s" placeholder="ID da view">
+            
+            <label>Email para Teste:</label>
+            <input type="email" id="testEmail" value="teste@example.com" placeholder="Email do usuário para testar">
+        </div>
+
+        <div class="test-section">
+            <h3>2. Testes</h3>
+            <button onclick="testConnection()">🔌 Testar Conexão</button>
+            <button onclick="testRead()">📖 Testar Leitura</button>
+            <button onclick="testWrite()">✍️ Testar Escrita</button>
+            <button onclick="testUpdate()">🔄 Testar Atualização</button>
+            <button onclick="testAll()">✅ Executar Todos os Testes</button>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Resultados</h3>
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <script>
+        function getConfig() {
+            return {
+                token: document.getElementById('token').value.trim(),
+                url: document.getElementById('url').value.trim(),
+                viewId: document.getElementById('viewId').value.trim(),
+                testEmail: document.getElementById('testEmail').value.trim()
+            };
+        }
+
+        function showResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${type}`;
+            resultDiv.textContent = message;
+            resultsDiv.appendChild(resultDiv);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testConnection() {
+            clearResults();
+            const config = getConfig();
+            showResult('🔌 Testando conexão com NocoDB...', 'info');
+            
+            try {
+                const params = new URLSearchParams({
+                    offset: '0',
+                    limit: '1',
+                    where: '',
+                    viewId: config.viewId || ''
+                });
+                const url = `${config.url}?${params.toString()}`;
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'xc-token': config.token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('✅ Conexão bem-sucedida!\n\nResposta:\n' + JSON.stringify(data, null, 2), 'success');
+                } else {
+                    const errorText = await response.text();
+                    showResult('❌ Erro na conexão:\n\nStatus: ' + response.status + '\nResposta: ' + errorText, 'error');
+                }
+            } catch (error) {
+                showResult('❌ Erro ao conectar:\n\n' + error.message, 'error');
+            }
+        }
+
+        async function testRead() {
+            clearResults();
+            const config = getConfig();
+            showResult('📖 Testando leitura de dados...', 'info');
+            
+            try {
+                const emailToSearch = encodeURIComponent(config.testEmail);
+                const params = new URLSearchParams({
+                    offset: '0',
+                    limit: '25',
+                    where: `(Email,eq,${emailToSearch})`,
+                    viewId: config.viewId || ''
+                });
+                const url = `${config.url}?${params.toString()}`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'xc-token': config.token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const records = data.list || data.records || [];
+                    if (records.length > 0) {
+                        showResult('✅ Leitura bem-sucedida!\n\nRegistros encontrados: ' + records.length + '\n\nPrimeiro registro:\n' + JSON.stringify(records[0], null, 2), 'success');
+                    } else {
+                        showResult('ℹ️ Nenhum registro encontrado para o email: ' + config.testEmail + '\n\nIsso é normal se ainda não houver dados salvos.', 'info');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    showResult('❌ Erro na leitura:\n\nStatus: ' + response.status + '\nResposta: ' + errorText, 'error');
+                }
+            } catch (error) {
+                showResult('❌ Erro ao ler dados:\n\n' + error.message, 'error');
+            }
+        }
+
+        async function testWrite() {
+            clearResults();
+            const config = getConfig();
+            showResult('✍️ Testando escrita de dados...', 'info');
+            
+            try {
+                // Formato atualizado: todos os dados financeiros em um único campo JSON
+                const financeData = {
+                    transactions: [{
+                        id: Date.now(),
+                        date: new Date().toISOString().split('T')[0],
+                        type: 'Despesa',
+                        amount: 100.00,
+                        descricao: 'Teste de conexão',
+                        obs: 'Dado de teste'
+                    }],
+                    faturasParceladas: [],
+                    despesasRecorrentes: [],
+                    receitasRecorrentes: [],
+                    updated_at: new Date().toISOString()
+                };
+                
+                const testData = {
+                    Email: config.testEmail,
+                    UserId: 'test-user-' + Date.now(),
+                    FinanceData: JSON.stringify(financeData)
+                    // UpdatedAt é auto-gerado pelo NocoDB, não deve ser enviado
+                };
+
+                const params = new URLSearchParams({
+                    offset: '0',
+                    limit: '25',
+                    where: '',
+                    viewId: config.viewId || ''
+                });
+                const url = `${config.url}?${params.toString()}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'xc-token': config.token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('✅ Escrita bem-sucedida!\n\nRegistro criado:\n' + JSON.stringify(data, null, 2), 'success');
+                } else {
+                    const errorText = await response.text();
+                    showResult('❌ Erro na escrita:\n\nStatus: ' + response.status + '\nResposta: ' + errorText + '\n\nDados enviados:\n' + JSON.stringify(testData, null, 2), 'error');
+                }
+            } catch (error) {
+                showResult('❌ Erro ao escrever dados:\n\n' + error.message, 'error');
+            }
+        }
+
+        async function testUpdate() {
+            clearResults();
+            const config = getConfig();
+            showResult('🔄 Testando atualização de dados...', 'info');
+            
+            try {
+                // Primeiro, buscar um registro existente
+                const emailToSearch = encodeURIComponent(config.testEmail);
+                const readParams = new URLSearchParams({
+                    offset: '0',
+                    limit: '25',
+                    where: `(Email,eq,${emailToSearch})`,
+                    viewId: config.viewId || ''
+                });
+                const readUrl = `${config.url}?${readParams.toString()}`;
+                
+                const readResponse = await fetch(readUrl, {
+                    method: 'GET',
+                    headers: {
+                        'xc-token': config.token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!readResponse.ok) {
+                    showResult('❌ Erro ao buscar registro para atualizar:\n\nStatus: ' + readResponse.status, 'error');
+                    return;
+                }
+
+                const readData = await readResponse.json();
+                const records = readData.list || readData.records || [];
+
+                if (records.length === 0) {
+                    showResult('ℹ️ Nenhum registro encontrado para atualizar. Execute primeiro o teste de escrita.', 'info');
+                    return;
+                }
+
+                const recordId = records[0].Id || records[0].id || records[0]._id;
+                if (!recordId) {
+                    showResult('❌ Não foi possível identificar o ID do registro.', 'error');
+                    return;
+                }
+
+                // Formato atualizado: atualizar apenas FinanceData
+                const financeData = {
+                    transactions: [{
+                        id: Date.now(),
+                        date: new Date().toISOString().split('T')[0],
+                        type: 'Receita',
+                        amount: 200.00,
+                        descricao: 'Teste de atualização',
+                        obs: 'Dado atualizado'
+                    }],
+                    faturasParceladas: [],
+                    despesasRecorrentes: [],
+                    receitasRecorrentes: [],
+                    updated_at: new Date().toISOString()
+                };
+                
+                const updateData = {
+                    FinanceData: JSON.stringify(financeData)
+                    // UpdatedAt é auto-gerado pelo NocoDB, não deve ser enviado
+                };
+
+                const updateUrl = `${config.url}/${recordId}`;
+                const updateResponse = await fetch(updateUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'xc-token': config.token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updateData)
+                });
+
+                if (updateResponse.ok) {
+                    const data = await updateResponse.json();
+                    showResult('✅ Atualização bem-sucedida!\n\nRegistro atualizado:\n' + JSON.stringify(data, null, 2), 'success');
+                } else {
+                    const errorText = await updateResponse.text();
+                    showResult('❌ Erro na atualização:\n\nStatus: ' + updateResponse.status + '\nResposta: ' + errorText + '\n\nDados enviados:\n' + JSON.stringify(updateData, null, 2), 'error');
+                }
+            } catch (error) {
+                showResult('❌ Erro ao atualizar dados:\n\n' + error.message, 'error');
+            }
+        }
+
+        async function testAll() {
+            clearResults();
+            showResult('🚀 Executando todos os testes...\n\n', 'info');
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testConnection();
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testRead();
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testWrite();
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testUpdate();
+            
+            showResult('\n✅ Todos os testes concluídos!', 'success');
+        }
+    </script>
+</body>
+</html>
+

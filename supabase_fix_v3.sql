@@ -66,3 +66,4 @@ GRANT EXECUTE ON FUNCTION public.get_user_id() TO authenticated;
 -- IMPORTANTE: Após executar este SQL, vá em Settings > API > Refresh Schema
 -- Isso atualiza o cache do schema do Supabase
 
+
