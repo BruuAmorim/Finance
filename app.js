@@ -130,9 +130,14 @@ document.addEventListener("DOMContentLoaded", () => {
 //  SALVAR NO LOCALSTORAGE
 // ===============================
 function salvarLocal() {
-    // Salva apenas localmente; envio para o NocoDB agora é manual (botão "Salvar na nuvem")
-    localStorage.setItem("transactions", JSON.stringify(transactions));
-    atualizarBackupUsuarioLocal();
+    // Somente persiste se houver usuário logado
+    if (isLoggedIn && currentUser) {
+        localStorage.setItem("transactions", JSON.stringify(transactions));
+        atualizarBackupUsuarioLocal();
+    } else {
+        // Visitante sem login: não manter dados após recarregar
+        localStorage.removeItem("transactions");
+    }
 }
 
 // ===============================
@@ -863,9 +868,13 @@ function atualizarGraficoLinha(transacoes, mes, ano) {
 // ===============================
 
 function salvarFaturasLocal() {
-    // Salva apenas localmente; sincronização com NocoDB é manual
-    localStorage.setItem("faturasParceladas", JSON.stringify(faturasParceladas));
-    atualizarBackupUsuarioLocal();
+    // Somente persiste se houver usuário logado
+    if (isLoggedIn && currentUser) {
+        localStorage.setItem("faturasParceladas", JSON.stringify(faturasParceladas));
+        atualizarBackupUsuarioLocal();
+    } else {
+        localStorage.removeItem("faturasParceladas");
+    }
 }
 
 function toggleFaturaForm() {
@@ -1512,9 +1521,13 @@ function removerFatura(faturaId) {
 // ===============================
 
 function salvarDespesasRecorrentesLocal() {
-    // Salva apenas localmente; sincronização com NocoDB é manual
-    localStorage.setItem("despesasRecorrentes", JSON.stringify(despesasRecorrentes));
-    atualizarBackupUsuarioLocal();
+    // Somente persiste se houver usuário logado
+    if (isLoggedIn && currentUser) {
+        localStorage.setItem("despesasRecorrentes", JSON.stringify(despesasRecorrentes));
+        atualizarBackupUsuarioLocal();
+    } else {
+        localStorage.removeItem("despesasRecorrentes");
+    }
 }
 
 function toggleDespesaRecorrenteForm() {
@@ -1967,9 +1980,13 @@ function removerDespesaRecorrente(despesaId) {
 // ===============================
 
 function salvarReceitasRecorrentesLocal() {
-    // Salva apenas localmente; sincronização com NocoDB é manual
-    localStorage.setItem("receitasRecorrentes", JSON.stringify(receitasRecorrentes));
-    atualizarBackupUsuarioLocal();
+    // Somente persiste se houver usuário logado
+    if (isLoggedIn && currentUser) {
+        localStorage.setItem("receitasRecorrentes", JSON.stringify(receitasRecorrentes));
+        atualizarBackupUsuarioLocal();
+    } else {
+        localStorage.removeItem("receitasRecorrentes");
+    }
 }
 
 function toggleReceitaRecorrenteForm() {
@@ -2603,13 +2620,33 @@ function mostrarErro(mensagem) {
 }
 
 async function logout() {
-    if (confirm('Deseja realmente sair? Seus dados locais serão mantidos.')) {
+    if (confirm('Deseja realmente sair? Os dados deste usuário serão mantidos apenas na nuvem e no backup local, e os dados visíveis na tela serão limpos neste dispositivo.')) {
+        // Limpar dados em memória
+        transactions = [];
+        faturasParceladas = [];
+        despesasRecorrentes = [];
+        receitasRecorrentes = [];
+
+        // Limpar dados locais visíveis (dados globais)
+        localStorage.removeItem('transactions');
+        localStorage.removeItem('faturasParceladas');
+        localStorage.removeItem('despesasRecorrentes');
+        localStorage.removeItem('receitasRecorrentes');
+
+        // Remover usuário atual (mantendo apenas snapshots por usuário, se existirem)
         currentUser = null;
         isLoggedIn = false;
         localStorage.removeItem('userData');
         localStorage.removeItem('authToken');
+
+        // Atualizar interface para estado vazio/logoff
         atualizarUIUsuario();
-        alert('Logout realizado com sucesso!');
+        updateUI(currentMonth, currentYear);
+        atualizarTabelaFaturas();
+        atualizarTabelaDespesasRecorrentes();
+        atualizarTabelaReceitasRecorrentes();
+
+        alert('Logout realizado com sucesso! Os dados locais deste usuário foram removidos da tela deste dispositivo.');
     }
 }
 
