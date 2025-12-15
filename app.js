@@ -2624,12 +2624,26 @@ async function fazerCadastro() {
         const authResult = await authService.signUp(email, password, nome);
         
         if (!authResult.success) {
-            mostrarErro(authResult.error || 'Erro ao cadastrar usuário!');
+            console.error('❌ Falha no cadastro Supabase:', authResult.error);
+            mostrarErro(authResult.error || 'Erro ao cadastrar usuário! Verifique o console para mais detalhes.');
             return;
         }
         
         const supabaseUser = authResult.user;
         console.log('✅ Usuário registrado no Supabase Auth:', supabaseUser.id);
+        
+        // Verificar se há sessão (usuário logado automaticamente)
+        if (!authResult.session) {
+            console.warn('⚠️ ATENÇÃO: Sessão não criada após cadastro');
+            console.warn('⚠️ Isso geralmente significa que o Supabase está exigindo confirmação de email');
+            console.warn('⚠️ SOLUÇÃO: No painel do Supabase, vá em Auth > Settings > Email Auth');
+            console.warn('⚠️ Desabilite "Enable email confirmations" para permitir login imediato');
+            
+            mostrarErro('Cadastro realizado, mas é necessário confirmar o email antes de fazer login. Verifique sua caixa de entrada ou desabilite a confirmação de email no Supabase.');
+            return;
+        }
+        
+        console.log('✅ Sessão criada - usuário logado automaticamente');
         
         // 2. Criar perfil financeiro no NocoDB (SEM senha - apenas Email, UserId, nome)
         console.log('🔄 Criando perfil financeiro no NocoDB...');

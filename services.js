@@ -79,14 +79,25 @@ class SupabaseAuthService {
         }
 
         try {
+            // Configurar signUp com auto-confirmação (para desenvolvimento)
+            // Em produção, você pode querer habilitar confirmação de email
             const { data, error } = await this.client.auth.signUp({
                 email: email.trim(),
                 password: password,
                 options: {
                     data: {
                         nome: nome.trim()
-                    }
+                    },
+                    // Auto-confirmar email (para desenvolvimento)
+                    // Em produção, remova esta opção para exigir confirmação
+                    emailRedirectTo: window.location.origin
                 }
+            });
+            
+            console.log('📧 Resposta do Supabase signUp:', {
+                user: data?.user ? { id: data.user.id, email: data.user.email } : null,
+                session: data?.session ? 'Sessão criada' : 'Sem sessão (requer confirmação)',
+                error: error?.message
             });
 
             if (error) {
