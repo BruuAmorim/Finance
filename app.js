@@ -12,15 +12,10 @@ let isLoggedIn = false;
 let currentAuthForm = 'login'; // 'login' ou 'cadastro'
 
 // ===============================
-//  CONFIGURAÇÃO DO NOCODB
+//  CONFIGURAÇÃO
 // ===============================
-// URL oficial informada:
-// https://app.nocodb.com/api/v2/tables/mht7b7fomr6g2it/records?offset=0&limit=25&where=&viewId=vwp00extw4gab91s
-// Usaremos a parte base + construímos os parâmetros via URLSearchParams.
-const NOCODB_API_TOKEN = 'YXvXeKm4xqldUZIZxtwt8tslZxStu08SqXr2mOs_';
-const NOCODB_BASE_URL = 'https://app.nocodb.com/api/v2/tables/mht7b7fomr6g2it/records';
-const NOCODB_VIEW_ID = 'vwp00extw4gab91s';
-let USE_NOCODB = true; // Flag para habilitar/desabilitar NocoDB
+// NOTA: As configurações de Supabase Auth e NocoDB foram movidas para services.js
+// As constantes estão disponíveis globalmente após o carregamento de services.js
 
 // ===============================
 //  CARREGAR DO LOCALSTORAGE
@@ -2380,22 +2375,52 @@ function carregarModoEscuro() {
 
 // Verificar login será chamado no DOMContentLoaded principal
 
+/**
+ * Verifica se há uma sessão ativa no Supabase Auth
+ * Se houver, carrega os dados do usuário e financeiros
+ */
 async function verificarLogin() {
-    // Sistema de autenticação simplificado usando apenas localStorage
-    verificarLoginLocalStorage();
-}
-
-function verificarLoginLocalStorage() {
-    const userData = localStorage.getItem('userData');
-    if (userData) {
-        try {
-            currentUser = JSON.parse(userData);
+    try {
+        // 1. Inicializar Supabase Auth
+        await authService.initialize();
+        
+        // 2. Verificar se há sessão ativa
+        const sessionResult = await authService.getSession();
+        
+        if (sessionResult.success && sessionResult.user) {
+            // 3. Usuário autenticado - configurar estado
+            currentUser = {
+                id: sessionResult.user.id, // UUID do Supabase Auth
+                email: sessionResult.user.email,
+                nome: sessionResult.user.nome
+            };
             isLoggedIn = true;
+            localStorage.setItem('userData', JSON.stringify(currentUser));
+            
+            // 4. Carregar dados financeiros
+            await carregarDadosUsuario();
+            
+            // 5. Atualizar UI
             atualizarUIUsuario();
-            carregarDadosUsuario();
-        } catch (e) {
-            console.error('Erro ao carregar dados do usuário:', e);
+        } else {
+            // Nenhuma sessão ativa - verificar localStorage como fallback
+            const userData = localStorage.getItem('userData');
+            if (userData) {
+                try {
+                    const parsed = JSON.parse(userData);
+                    // Se o userData tem um UUID (formato Supabase), tentar verificar sessão
+                    // Caso contrário, é um usuário antigo - não fazer nada
+                    if (parsed.id && parsed.id.length === 36) { // UUID tem 36 caracteres
+                        // Tentar verificar sessão novamente
+                        console.log('⚠️ UserData encontrado mas sem sessão ativa');
+                    }
+                } catch (e) {
+                    console.error('Erro ao carregar dados do usuário:', e);
+                }
+            }
         }
+    } catch (error) {
+        console.error('Erro ao verificar login:', error);
     }
 }
 
@@ -2508,6 +2533,10 @@ async function handleAuth(e) {
     }
 }
 
+/**
+ * Faz login usando Supabase Auth
+ * Após autenticação bem-sucedida, carrega dados financeiros do NocoDB
+ */
 async function fazerLogin() {
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
@@ -2517,50 +2546,45 @@ async function fazerLogin() {
         return;
     }
     
-    // Tentar buscar usuário no NocoDB primeiro (funciona em qualquer dispositivo)
-    let user = null;
-    if (USE_NOCODB) {
-        user = await buscarUsuarioNocoDB(email, password);
-    }
-    
-    // Se não encontrou no NocoDB, tentar no localStorage (fallback)
-    if (!user) {
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        const localUser = users.find(u => u.email === email && u.password === password);
-        if (localUser) {
-            user = {
-                email: localUser.email,
-                nome: localUser.nome,
-                id: localUser.id || localUser.email
-            };
-            // Sincronizar com NocoDB para funcionar em outros dispositivos
-            await salvarUsuarioNocoDB(user.email, password, user.nome, user.id);
+    try {
+        // 1. Autenticar via Supabase Auth (NUNCA salva senha no NocoDB)
+        const authResult = await authService.signIn(email, password);
+        
+        if (!authResult.success) {
+            mostrarErro(authResult.error || 'Email ou senha incorretos!');
+            return;
         }
-    }
-    
-    if (user) {
-        currentUser = user;
+        
+        // 2. Usuário autenticado com sucesso no Supabase
+        const supabaseUser = authResult.user;
+        
+        // 3. Configurar usuário atual
+        currentUser = {
+            id: supabaseUser.id, // UUID do Supabase Auth
+            email: supabaseUser.email,
+            nome: supabaseUser.nome
+        };
         isLoggedIn = true;
         localStorage.setItem('userData', JSON.stringify(currentUser));
-        // Salvar também no localStorage local para fallback
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        const existingUserIndex = users.findIndex(u => u.email === email);
-        if (existingUserIndex >= 0) {
-            users[existingUserIndex] = { ...users[existingUserIndex], ...user, password };
-        } else {
-            users.push({ ...user, password });
-        }
-        localStorage.setItem('users', JSON.stringify(users));
         
+        // 4. Carregar dados financeiros do NocoDB usando o UserId (UUID)
+        await carregarDadosUsuario();
+        
+        // 5. Atualizar UI
         atualizarUIUsuario();
         fecharModalAuth();
-        await carregarDadosUsuario();
+        
         alert('Login realizado com sucesso!');
-    } else {
-        mostrarErro('Email ou senha incorretos!');
+    } catch (error) {
+        console.error('Erro ao fazer login:', error);
+        mostrarErro('Erro ao fazer login. Tente novamente.');
     }
 }
 
+/**
+ * Registra novo usuário usando Supabase Auth
+ * Após registro bem-sucedido, cria perfil financeiro no NocoDB (SEM senha)
+ */
 async function fazerCadastro() {
     try {
         const nomeEl = document.getElementById('cadastroNome');
@@ -2579,6 +2603,7 @@ async function fazerCadastro() {
         const password = passwordEl.value;
         const passwordConfirm = passwordConfirmEl.value;
         
+        // Validações
         if (!email || !password || !passwordConfirm) {
             mostrarErro('Preencha todos os campos obrigatórios!');
             return;
@@ -2594,74 +2619,51 @@ async function fazerCadastro() {
             return;
         }
         
-        // Verificar se email já existe no NocoDB
-        let emailExiste = false;
-        if (USE_NOCODB) {
-            const emailToSearch = encodeURIComponent(email);
-            const checkParams = new URLSearchParams({
-                offset: '0',
-                limit: '25',
-                where: `(Email,eq,${emailToSearch})`,
-                viewId: NOCODB_VIEW_ID
-            });
-            const checkUrl = `${NOCODB_BASE_URL}?${checkParams.toString()}`;
-            const checkResponse = await fetch(checkUrl, {
-                method: 'GET',
-                headers: {
-                    'xc-token': NOCODB_API_TOKEN,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (checkResponse.ok) {
-                const checkData = await checkResponse.json();
-                const existingRecords = checkData.list || checkData.records || [];
-                emailExiste = existingRecords.length > 0;
-            }
-        }
+        // 1. Registrar usuário no Supabase Auth (gerencia senha de forma segura)
+        console.log('🔄 Registrando usuário no Supabase Auth...');
+        const authResult = await authService.signUp(email, password, nome);
         
-        // Verificar também no localStorage local
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        if (emailExiste || users.find(u => u.email === email)) {
-            mostrarErro('Este email já está cadastrado!');
+        if (!authResult.success) {
+            mostrarErro(authResult.error || 'Erro ao cadastrar usuário!');
             return;
         }
         
-        const newUser = {
-            id: Date.now().toString(), // ID único baseado em timestamp
-            nome: nome || 'Usuário',
-            email,
-            password: password // Em produção, isso deve ser criptografado!
-        };
+        const supabaseUser = authResult.user;
+        console.log('✅ Usuário registrado no Supabase Auth:', supabaseUser.id);
         
-        // Salvar no NocoDB primeiro (para funcionar em qualquer dispositivo)
-        if (USE_NOCODB) {
-            console.log('🔄 Tentando salvar usuário no NocoDB...', { email: newUser.email, nome: newUser.nome });
-            const sucessoNoco = await salvarUsuarioNocoDB(newUser.email, newUser.password, newUser.nome, newUser.id);
-            if (!sucessoNoco) {
-                console.error('❌ Falha ao salvar no NocoDB. Verifique o console para mais detalhes.');
-                mostrarErro('Não foi possível salvar no NocoDB. Verifique se os campos Password e Nome existem na tabela. O cadastro local foi realizado.');
-                // Continuar mesmo se falhar no NocoDB
-            } else {
-                console.log('✅ Usuário salvo com sucesso no NocoDB!');
-            }
+        // 2. Criar perfil financeiro no NocoDB (SEM senha - apenas Email, UserId, nome)
+        console.log('🔄 Criando perfil financeiro no NocoDB...');
+        const financeResult = await financeService.createFinanceProfile({
+            userId: supabaseUser.id, // UUID do Supabase Auth
+            email: supabaseUser.email,
+            nome: supabaseUser.nome
+        });
+        
+        if (!financeResult.success) {
+            console.warn('⚠️ Aviso: Não foi possível criar perfil financeiro no NocoDB:', financeResult.error);
+            console.warn('⚠️ O usuário foi criado no Supabase, mas o perfil financeiro precisa ser criado manualmente.');
+            // Continuar mesmo se falhar - o usuário pode criar o perfil depois
+        } else {
+            console.log('✅ Perfil financeiro criado no NocoDB');
         }
         
-        // Salvar também no localStorage local (fallback)
-        users.push(newUser);
-        localStorage.setItem('users', JSON.stringify(users));
-        
-        currentUser = { 
-            email: newUser.email, 
-            nome: newUser.nome,
-            id: newUser.id
+        // 3. Configurar usuário atual
+        currentUser = {
+            id: supabaseUser.id, // UUID do Supabase Auth
+            email: supabaseUser.email,
+            nome: supabaseUser.nome
         };
         isLoggedIn = true;
         localStorage.setItem('userData', JSON.stringify(currentUser));
+        
+        // 4. Carregar dados financeiros (pode estar vazio se o perfil não foi criado)
+        await carregarDadosUsuario();
+        
+        // 5. Atualizar UI
         atualizarUIUsuario();
         fecharModalAuth();
         
-        alert('Cadastro realizado com sucesso! Agora você pode fazer login em qualquer dispositivo.');
+        alert('Cadastro realizado com sucesso! Verifique seu email para confirmar a conta.');
     } catch (error) {
         console.error('Erro em fazerCadastro:', error);
         mostrarErro('Ocorreu um erro ao processar o cadastro: ' + (error.message || 'Erro desconhecido'));
@@ -2713,9 +2715,24 @@ async function logout() {
 // ===============================
 //  SINCRONIZAÇÃO DE DADOS - NOCODB
 // ===============================
+// NOTA: As funções antigas foram removidas.
+// Agora usamos os services centralizados (services.js):
+// - authService: Gerencia autenticação via Supabase Auth
+// - financeService: Gerencia dados financeiros no NocoDB
+// 
+// NUNCA salvar senhas no NocoDB - apenas dados financeiros!
 
-// Função para salvar usuário no NocoDB (para autenticação entre dispositivos)
-async function salvarUsuarioNocoDB(email, password, nome, userId) {
+// ===============================
+//  FUNÇÕES ANTIGAS REMOVIDAS
+// ===============================
+// As seguintes funções foram removidas e substituídas pelos services:
+// - salvarUsuarioNocoDB() → authService.signUp() + financeService.createFinanceProfile()
+// - buscarUsuarioNocoDB() → authService.signIn()
+// - salvarDadosNocoDB() → financeService.updateFinanceByUserId()
+// - carregarDadosNocoDB() → financeService.getFinanceByUserId()
+
+// Função antiga removida - usar authService.signUp() + financeService.createFinanceProfile()
+async function salvarUsuarioNocoDB_DEPRECATED(email, password, nome, userId) {
     if (!USE_NOCODB) return false;
     
     try {
@@ -3065,28 +3082,47 @@ async function carregarDadosNocoDB() {
 //  SINCRONIZAÇÃO DE DADOS
 // ===============================
 
+/**
+ * Salva dados financeiros do usuário no NocoDB usando PATCH (atualização parcial)
+ * NUNCA salva senha - apenas dados financeiros
+ */
 async function salvarDadosUsuario() {
-    if (!isLoggedIn || !currentUser) return;
-    
-    const dadosUsuario = {
-        transactions,
-        faturasParceladas,
-        despesasRecorrentes,
-        receitasRecorrentes,
-        user_id: currentUser.id || currentUser.email,
-        updated_at: new Date().toISOString()
-    };
-    
-    // Salvar no NocoDB (backend principal)
-    let sucessoNoco = false;
-    if (USE_NOCODB) {
-        sucessoNoco = await salvarDadosNocoDB(dadosUsuario);
+    if (!isLoggedIn || !currentUser) {
+        console.warn('⚠️ Tentativa de salvar dados sem usuário logado');
+        return false;
     }
     
-    // Sempre manter uma cópia no localStorage (por usuário) como backup
-    localStorage.setItem(`userData_${currentUser.email}`, JSON.stringify(dadosUsuario));
-
-    return sucessoNoco;
+    try {
+        // Usar o financeService para atualizar dados financeiros (PATCH)
+        const result = await financeService.updateFinanceByUserId(currentUser.id, {
+            faturasParceladas: faturasParceladas,
+            despesasRecorrentes: despesasRecorrentes,
+            receitasRecorrentes: receitasRecorrentes
+        });
+        
+        if (result.success) {
+            console.log('✅ Dados financeiros salvos no NocoDB');
+            
+            // Sempre manter uma cópia no localStorage como backup
+            const dadosUsuario = {
+                transactions,
+                faturasParceladas,
+                despesasRecorrentes,
+                receitasRecorrentes,
+                user_id: currentUser.id,
+                updated_at: new Date().toISOString()
+            };
+            localStorage.setItem(`userData_${currentUser.email}`, JSON.stringify(dadosUsuario));
+            
+            return true;
+        } else {
+            console.error('❌ Erro ao salvar dados financeiros:', result.error);
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Erro ao salvar dados financeiros:', error);
+        return false;
+    }
 }
 
 // Atualiza o snapshot de dados financeiros do usuário logado no localStorage
@@ -3137,56 +3173,82 @@ async function sincronizarDadosNuvem() {
     }
 }
 
+/**
+ * Carrega dados financeiros do usuário do NocoDB usando UserId (UUID do Supabase)
+ * Compara com backup local e usa o mais recente
+ */
 async function carregarDadosUsuario() {
-    if (!isLoggedIn || !currentUser) return;
-    
-    // 1) Tentar carregar primeiro o snapshot local do usuário
-    let dadosSelecionados = null;
-    const chave = `userData_${currentUser.email}`;
-    const localSalvo = localStorage.getItem(chave);
-    if (localSalvo) {
-        try {
-            dadosSelecionados = JSON.parse(localSalvo);
-        } catch (e) {
-            console.warn('Não foi possível ler dados locais do usuário, ignorando snapshot.', e);
-        }
+    if (!isLoggedIn || !currentUser || !currentUser.id) {
+        console.warn('⚠️ Tentativa de carregar dados sem usuário logado ou sem ID');
+        return;
     }
+    
+    try {
+        // 1. Tentar carregar backup local primeiro
+        let dadosSelecionados = null;
+        const chave = `userData_${currentUser.email}`;
+        const localSalvo = localStorage.getItem(chave);
+        if (localSalvo) {
+            try {
+                dadosSelecionados = JSON.parse(localSalvo);
+            } catch (e) {
+                console.warn('⚠️ Não foi possível ler dados locais do usuário:', e);
+            }
+        }
 
-    // 2) Tentar buscar no NocoDB e comparar datas (usa o mais recente)
-    if (USE_NOCODB) {
-        const dadosNocoDB = await carregarDadosNocoDB();
-        if (dadosNocoDB) {
-            const dataLocal = dadosSelecionados && dadosSelecionados.updated_at ? new Date(dadosSelecionados.updated_at).getTime() : 0;
-            const dataNoco = dadosNocoDB.updated_at ? new Date(dadosNocoDB.updated_at).getTime() : 0;
+        // 2. Buscar dados financeiros no NocoDB usando UserId (UUID do Supabase)
+        const financeResult = await financeService.getFinanceByUserId(currentUser.id);
+        
+        if (financeResult.success && financeResult.data) {
+            const dadosNocoDB = {
+                faturasParceladas: financeResult.data.faturasParceladas || [],
+                despesasRecorrentes: financeResult.data.despesasRecorrentes || [],
+                receitasRecorrentes: financeResult.data.receitasRecorrentes || [],
+                transactions: [], // Não está sendo salvo no NocoDB atualmente
+                updated_at: financeResult.data.created_at || new Date().toISOString()
+            };
+            
+            // Comparar datas e usar o mais recente
+            const dataLocal = dadosSelecionados && dadosSelecionados.updated_at 
+                ? new Date(dadosSelecionados.updated_at).getTime() 
+                : 0;
+            const dataNoco = dadosNocoDB.updated_at 
+                ? new Date(dadosNocoDB.updated_at).getTime() 
+                : 0;
             
             if (!dadosSelecionados || dataNoco > dataLocal) {
                 dadosSelecionados = dadosNocoDB;
-                console.log('✅ Dados carregados do NocoDB (mais recentes que o local).');
+                console.log('✅ Dados carregados do NocoDB (mais recentes que o local)');
             } else {
-                console.log('ℹ️ Mantendo dados locais mais recentes que os do NocoDB.');
+                console.log('ℹ️ Mantendo dados locais mais recentes que os do NocoDB');
             }
+        } else if (financeResult.error) {
+            console.warn('⚠️ Erro ao carregar dados do NocoDB:', financeResult.error);
+            // Continuar com dados locais se houver
         }
-    }
 
-    if (dadosSelecionados) {
-        transactions = dadosSelecionados.transactions || [];
-        faturasParceladas = dadosSelecionados.faturasParceladas || [];
-        despesasRecorrentes = dadosSelecionados.despesasRecorrentes || [];
-        receitasRecorrentes = dadosSelecionados.receitasRecorrentes || [];
+        // 3. Aplicar dados carregados
+        if (dadosSelecionados) {
+            transactions = dadosSelecionados.transactions || [];
+            faturasParceladas = dadosSelecionados.faturasParceladas || [];
+            despesasRecorrentes = dadosSelecionados.despesasRecorrentes || [];
+            receitasRecorrentes = dadosSelecionados.receitasRecorrentes || [];
+            
+            // Atualizar localStorage padrão e snapshot local
+            salvarLocal();
+            salvarFaturasLocal();
+            salvarDespesasRecorrentesLocal();
+            salvarReceitasRecorrentesLocal();
+        }
         
-        // Atualizar localStorage padrão e snapshot local
-        salvarLocal();
-        salvarFaturasLocal();
-        salvarDespesasRecorrentesLocal();
-        salvarReceitasRecorrentesLocal();
-        
-        // Atualizar UI
+        // 4. Atualizar UI
         updateUI(currentMonth, currentYear);
         atualizarTabelaFaturas();
         atualizarTabelaDespesasRecorrentes();
         atualizarTabelaReceitasRecorrentes();
-    } else {
-        // Se não há dados de usuário, apenas mantém o que já foi carregado do localStorage global
+    } catch (error) {
+        console.error('❌ Erro ao carregar dados do usuário:', error);
+        // Manter dados locais se houver erro
         updateUI(currentMonth, currentYear);
         atualizarTabelaFaturas();
         atualizarTabelaDespesasRecorrentes();
