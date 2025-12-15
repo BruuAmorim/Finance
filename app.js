@@ -132,6 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
 function salvarLocal() {
     // Salva apenas localmente; envio para o NocoDB agora é manual (botão "Salvar na nuvem")
     localStorage.setItem("transactions", JSON.stringify(transactions));
+    atualizarBackupUsuarioLocal();
 }
 
 // ===============================
@@ -864,6 +865,7 @@ function atualizarGraficoLinha(transacoes, mes, ano) {
 function salvarFaturasLocal() {
     // Salva apenas localmente; sincronização com NocoDB é manual
     localStorage.setItem("faturasParceladas", JSON.stringify(faturasParceladas));
+    atualizarBackupUsuarioLocal();
 }
 
 function toggleFaturaForm() {
@@ -1512,6 +1514,7 @@ function removerFatura(faturaId) {
 function salvarDespesasRecorrentesLocal() {
     // Salva apenas localmente; sincronização com NocoDB é manual
     localStorage.setItem("despesasRecorrentes", JSON.stringify(despesasRecorrentes));
+    atualizarBackupUsuarioLocal();
 }
 
 function toggleDespesaRecorrenteForm() {
@@ -1966,6 +1969,7 @@ function removerDespesaRecorrente(despesaId) {
 function salvarReceitasRecorrentesLocal() {
     // Salva apenas localmente; sincronização com NocoDB é manual
     localStorage.setItem("receitasRecorrentes", JSON.stringify(receitasRecorrentes));
+    atualizarBackupUsuarioLocal();
 }
 
 function toggleReceitaRecorrenteForm() {
@@ -2821,6 +2825,34 @@ async function salvarDadosUsuario() {
     return sucessoNoco;
 }
 
+// Atualiza o snapshot de dados financeiros do usuário logado no localStorage
+function atualizarBackupUsuarioLocal() {
+    if (!isLoggedIn || !currentUser) return;
+    
+    const chave = `userData_${currentUser.email}`;
+    let dadosExistentes = {};
+    try {
+        const salvo = localStorage.getItem(chave);
+        if (salvo) {
+            dadosExistentes = JSON.parse(salvo) || {};
+        }
+    } catch (e) {
+        console.warn('Não foi possível ler userData local, recriando.', e);
+    }
+    
+    const dadosAtualizados = {
+        ...dadosExistentes,
+        user_id: currentUser.id || currentUser.email,
+        transactions,
+        faturasParceladas,
+        despesasRecorrentes,
+        receitasRecorrentes,
+        updated_at: new Date().toISOString()
+    };
+    
+    localStorage.setItem(chave, JSON.stringify(dadosAtualizados));
+}
+
 // Função chamada pelo botão "Salvar na nuvem"
 async function sincronizarDadosNuvem() {
     if (!isLoggedIn || !currentUser) {
@@ -2844,62 +2876,56 @@ async function sincronizarDadosNuvem() {
 async function carregarDadosUsuario() {
     if (!isLoggedIn || !currentUser) return;
     
-    // Tentar carregar do NocoDB primeiro (backend principal)
+    // 1) Tentar carregar primeiro o snapshot local do usuário
+    let dadosSelecionados = null;
+    const chave = `userData_${currentUser.email}`;
+    const localSalvo = localStorage.getItem(chave);
+    if (localSalvo) {
+        try {
+            dadosSelecionados = JSON.parse(localSalvo);
+        } catch (e) {
+            console.warn('Não foi possível ler dados locais do usuário, ignorando snapshot.', e);
+        }
+    }
+
+    // 2) Tentar buscar no NocoDB e comparar datas (usa o mais recente)
     if (USE_NOCODB) {
         const dadosNocoDB = await carregarDadosNocoDB();
         if (dadosNocoDB) {
-            transactions = dadosNocoDB.transactions || [];
-            faturasParceladas = dadosNocoDB.faturasParceladas || [];
-            despesasRecorrentes = dadosNocoDB.despesasRecorrentes || [];
-            receitasRecorrentes = dadosNocoDB.receitasRecorrentes || [];
+            const dataLocal = dadosSelecionados && dadosSelecionados.updated_at ? new Date(dadosSelecionados.updated_at).getTime() : 0;
+            const dataNoco = dadosNocoDB.updated_at ? new Date(dadosNocoDB.updated_at).getTime() : 0;
             
-            // Atualizar localStorage padrão
-            salvarLocal();
-            salvarFaturasLocal();
-            salvarDespesasRecorrentesLocal();
-            salvarReceitasRecorrentesLocal();
-            
-            // Atualizar UI
-            updateUI(currentMonth, currentYear);
-            atualizarTabelaFaturas();
-            atualizarTabelaDespesasRecorrentes();
-            atualizarTabelaReceitasRecorrentes();
-            
-            console.log('✅ Dados carregados do NocoDB');
-            return;
+            if (!dadosSelecionados || dataNoco > dataLocal) {
+                dadosSelecionados = dadosNocoDB;
+                console.log('✅ Dados carregados do NocoDB (mais recentes que o local).');
+            } else {
+                console.log('ℹ️ Mantendo dados locais mais recentes que os do NocoDB.');
+            }
         }
     }
 
-    // Fallback: carregar do localStorage (por usuário)
-    carregarDadosLocalStorage();
-}
-
-function carregarDadosLocalStorage() {
-    const dadosSalvos = localStorage.getItem(`userData_${currentUser.email}`);
-    if (dadosSalvos) {
-        try {
-            const dados = JSON.parse(dadosSalvos);
-            transactions = dados.transactions || [];
-            faturasParceladas = dados.faturasParceladas || [];
-            despesasRecorrentes = dados.despesasRecorrentes || [];
-            receitasRecorrentes = dados.receitasRecorrentes || [];
-            
-            // Atualizar localStorage padrão
-            salvarLocal();
-            salvarFaturasLocal();
-            salvarDespesasRecorrentesLocal();
-            salvarReceitasRecorrentesLocal();
-            
-            // Atualizar UI
-            updateUI(currentMonth, currentYear);
-            atualizarTabelaFaturas();
-            atualizarTabelaDespesasRecorrentes();
-            atualizarTabelaReceitasRecorrentes();
-        } catch (e) {
-            console.error('Erro ao carregar dados do usuário:', e);
-        }
+    if (dadosSelecionados) {
+        transactions = dadosSelecionados.transactions || [];
+        faturasParceladas = dadosSelecionados.faturasParceladas || [];
+        despesasRecorrentes = dadosSelecionados.despesasRecorrentes || [];
+        receitasRecorrentes = dadosSelecionados.receitasRecorrentes || [];
+        
+        // Atualizar localStorage padrão e snapshot local
+        salvarLocal();
+        salvarFaturasLocal();
+        salvarDespesasRecorrentesLocal();
+        salvarReceitasRecorrentesLocal();
+        
+        // Atualizar UI
+        updateUI(currentMonth, currentYear);
+        atualizarTabelaFaturas();
+        atualizarTabelaDespesasRecorrentes();
+        atualizarTabelaReceitasRecorrentes();
+    } else {
+        // Se não há dados de usuário, apenas mantém o que já foi carregado do localStorage global
+        updateUI(currentMonth, currentYear);
+        atualizarTabelaFaturas();
+        atualizarTabelaDespesasRecorrentes();
+        atualizarTabelaReceitasRecorrentes();
     }
 }
-
-// Funções de salvar serão modificadas para também salvar no servidor quando o usuário estiver logado
-// Isso é feito automaticamente através da função salvarDadosUsuario() que é chamada após cada salvamento
