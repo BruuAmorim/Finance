@@ -247,3 +247,4 @@ Se você tinha dados antigos salvos com senhas no NocoDB:
 
 **Última atualização**: Sistema refatorado para usar Supabase Auth exclusivamente para autenticação e NocoDB apenas para dados financeiros.
 
+

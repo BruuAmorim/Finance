@@ -197,3 +197,4 @@ A tabela deve ter os seguintes campos:
 **Segurança**: ✅ Senhas nunca são salvas no NocoDB
 **Arquitetura**: ✅ Separação clara entre autenticação (Supabase) e dados (NocoDB)
 
+

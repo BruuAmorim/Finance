@@ -105,3 +105,4 @@ Após desabilitar a confirmação de email:
 
 **IMPORTANTE**: Após desabilitar a confirmação de email, **teste novamente o cadastro e login** para confirmar que está funcionando.
 
+

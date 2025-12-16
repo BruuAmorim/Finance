@@ -92,3 +92,4 @@ COMMENT ON FUNCTION public.create_user_data(UUID) IS
 'Cria registro inicial na tabela user_data para um novo usuário. Usa SECURITY DEFINER para contornar RLS durante criação inicial.';
 
 
+

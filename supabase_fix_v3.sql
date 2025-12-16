@@ -67,3 +67,4 @@ GRANT EXECUTE ON FUNCTION public.get_user_id() TO authenticated;
 -- Isso atualiza o cache do schema do Supabase
 
 
+
