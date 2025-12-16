@@ -1,0 +1,39 @@
+[debug] [2025-12-16T16:13:03.652Z] ----------------------------------------------------------------------
+[debug] [2025-12-16T16:13:03.655Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Bruna\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js serve --only hosting --config firebase.json
+[debug] [2025-12-16T16:13:03.656Z] CLI Version:   15.0.0
+[debug] [2025-12-16T16:13:03.657Z] Platform:      win32
+[debug] [2025-12-16T16:13:03.657Z] Node Version:  v24.12.0
+[debug] [2025-12-16T16:13:03.657Z] Time:          Tue Dec 16 2025 13:13:03 GMT-0300 (Horário Padrão de Brasília)
+[debug] [2025-12-16T16:13:03.658Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-16T16:13:05.650Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-16T16:13:05.650Z] > authorizing via signed-in user (brunacristina@evacloudd.com)
+[debug] [2025-12-16T16:13:05.650Z] [iam] checking project financeevacloudd for permissions ["firebase.projects.get"]
+[debug] [2025-12-16T16:13:05.651Z] Checked if tokens are valid: true, expires at: 1765904312149
+[debug] [2025-12-16T16:13:05.652Z] Checked if tokens are valid: true, expires at: 1765904312149
+[debug] [2025-12-16T16:13:05.653Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/financeevacloudd:testIamPermissions [none]
+[debug] [2025-12-16T16:13:05.653Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/financeevacloudd:testIamPermissions x-goog-quota-user=projects/financeevacloudd
+[debug] [2025-12-16T16:13:05.653Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/financeevacloudd:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2025-12-16T16:13:06.717Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/financeevacloudd:testIamPermissions 200
+[debug] [2025-12-16T16:13:06.717Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/financeevacloudd:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2025-12-16T16:13:06.718Z] Checked if tokens are valid: true, expires at: 1765904312149
+[debug] [2025-12-16T16:13:06.718Z] Checked if tokens are valid: true, expires at: 1765904312149
+[debug] [2025-12-16T16:13:06.719Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/financeevacloudd [none]
+[debug] [2025-12-16T16:13:06.961Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/financeevacloudd 200
+[debug] [2025-12-16T16:13:06.961Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/financeevacloudd {"projectNumber":"183268593386","projectId":"financeevacloudd","lifecycleState":"ACTIVE","name":"FinanceEvacloudd","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-12-16T12:49:39.601612Z","parent":{"type":"organization","id":"559805641297"}}
+[debug] [2025-12-16T16:13:06.963Z] Checked if tokens are valid: true, expires at: 1765904312149
+[debug] [2025-12-16T16:13:06.963Z] Checked if tokens are valid: true, expires at: 1765904312149
+[debug] [2025-12-16T16:13:06.963Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/financeevacloudd/sites 
+[debug] [2025-12-16T16:13:08.095Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/financeevacloudd/sites 200
+[debug] [2025-12-16T16:13:08.095Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/financeevacloudd/sites {"sites":[{"name":"projects/financeevacloudd/sites/financeevacloudd","defaultUrl":"https://financeevacloudd.web.app","type":"DEFAULT_SITE"}]}
+[debug] [2025-12-16T16:13:08.095Z] Checked if tokens are valid: true, expires at: 1765904312149
+[debug] [2025-12-16T16:13:08.095Z] Checked if tokens are valid: true, expires at: 1765904312149
+[debug] [2025-12-16T16:13:08.096Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/financeevacloudd/webApps/-/config [none]
+[debug] [2025-12-16T16:13:08.997Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/financeevacloudd/webApps/-/config 200
+[debug] [2025-12-16T16:13:08.997Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/financeevacloudd/webApps/-/config {"projectId":"financeevacloudd","storageBucket":"financeevacloudd.firebasestorage.app","apiKey":"AIzaSyBiBFc3mDeL9qZ6LRJxzLCq2SLLFtVj9mQ","authDomain":"financeevacloudd.firebaseapp.com","messagingSenderId":"183268593386","projectNumber":"183268593386","version":"2"}
+[debug] [2025-12-16T16:13:09.008Z] Checked if tokens are valid: true, expires at: 1765904312149
+[debug] [2025-12-16T16:13:09.008Z] Checked if tokens are valid: true, expires at: 1765904312149
+[debug] [2025-12-16T16:13:09.009Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/financeevacloudd [none]
+[debug] [2025-12-16T16:13:09.372Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/financeevacloudd 200
+[debug] [2025-12-16T16:13:09.373Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/financeevacloudd {"projectId":"financeevacloudd","projectNumber":"183268593386","displayName":"FinanceEvacloudd","name":"projects/financeevacloudd","resources":{"hostingSite":"financeevacloudd"},"state":"ACTIVE","etag":"1_fbbdf54d-47f8-42c4-b572-193ad43bda02"}
+[info] +  hosting[financeevacloudd]: Local server: http://localhost:5000 {"metadata":{"emulator":{"name":"hosting"},"message":"Local server: \u001b[4m\u001b[1mhttp://localhost:5000\u001b[22m\u001b[24m"}}
