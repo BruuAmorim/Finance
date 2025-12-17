@@ -2697,6 +2697,21 @@ function mostrarErro(mensagem) {
 
 async function logout() {
     if (confirm('Deseja realmente sair? Os dados deste usuário serão mantidos apenas na nuvem e no backup local, e os dados visíveis na tela serão limpos neste dispositivo.')) {
+        // Encerrar sessão no Supabase para não restaurar login ao recarregar a página
+        try {
+            const signOutResult = await authService.signOut();
+            if (!signOutResult.success) {
+                console.warn('Falha ao encerrar sessão no Supabase:', signOutResult.error);
+            }
+        } catch (error) {
+            console.error('Erro ao encerrar sessão no Supabase:', error);
+        }
+
+        // Remover tokens locais do Supabase (garante que a sessão não volte após refresh)
+        Object.keys(localStorage)
+            .filter(key => key.startsWith('sb-') || key.includes('supabase'))
+            .forEach(key => localStorage.removeItem(key));
+
         // Limpar dados em memória
         transactions = [];
         faturasParceladas = [];
@@ -3109,6 +3124,7 @@ async function salvarDadosUsuario() {
     try {
         // Usar o financeService para atualizar dados financeiros (PATCH)
         const result = await financeService.updateFinanceByUserId(currentUser.id, {
+            transactions: transactions,
             faturasParceladas: faturasParceladas,
             despesasRecorrentes: despesasRecorrentes,
             receitasRecorrentes: receitasRecorrentes
@@ -3215,10 +3231,10 @@ async function carregarDadosUsuario() {
         
         if (financeResult.success && financeResult.data) {
             const dadosNocoDB = {
+                transactions: financeResult.data.transactions || [],
                 faturasParceladas: financeResult.data.faturasParceladas || [],
                 despesasRecorrentes: financeResult.data.despesasRecorrentes || [],
                 receitasRecorrentes: financeResult.data.receitasRecorrentes || [],
-                transactions: [], // Não está sendo salvo no NocoDB atualmente
                 updated_at: financeResult.data.created_at || new Date().toISOString()
             };
             

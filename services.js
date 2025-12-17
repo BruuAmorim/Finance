@@ -315,6 +315,7 @@ class NocoDBFinanceService {
                 Email: email.trim(),
                 UserId: userId, // UUID do Supabase Auth
                 nome: nome.trim() || 'Usuário',
+                Transactions: JSON.stringify([]),
                 FaturasParceladas: JSON.stringify([]),
                 DespesasRecorrentes: JSON.stringify([]),
                 ReceitasRecorrentes: JSON.stringify([])
@@ -416,12 +417,19 @@ class NocoDBFinanceService {
                             : record.ReceitasRecorrentes)
                         : [];
 
+                    const transactions = record.Transactions
+                        ? (typeof record.Transactions === 'string'
+                            ? JSON.parse(record.Transactions)
+                            : record.Transactions)
+                        : [];
+
                     return {
                         success: true,
                         data: {
                             email: record.Email,
                             userId: record.UserId,
                             nome: record.nome || record.Nome,
+                            transactions: transactions,
                             faturasParceladas: faturas,
                             despesasRecorrentes: despesas,
                             receitasRecorrentes: receitas,
@@ -525,6 +533,12 @@ class NocoDBFinanceService {
 
             // Preparar dados para atualização (PATCH - apenas campos fornecidos)
             const updateData = {};
+            
+            if (data.transactions !== undefined) {
+                updateData.Transactions = typeof data.transactions === 'string'
+                    ? data.transactions
+                    : JSON.stringify(data.transactions);
+            }
             
             if (data.faturasParceladas !== undefined) {
                 updateData.FaturasParceladas = typeof data.faturasParceladas === 'string' 
