@@ -11,8 +11,8 @@
 const SUPABASE_URL = 'https://ffpmfqqvxeuvjcgyjsen.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmcG1mcXF2eGV1dmpjZ3lqc2VuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0NzE5OTgsImV4cCI6MjA4MTA0Nzk5OH0.XfcdBtF7aUnrsbDA_A4DEuX6KOvgOOa9bVvV2unYmJg';
 
-// Supabase - tabela de finanças
-const SUPABASE_FINANCE_TABLE = 'finances';
+// Supabase - tabela de finanças (nome igual ao script SQL)
+const SUPABASE_FINANCE_TABLE = 'finance_data';
 
 // NocoDB
 const NOCODB_API_TOKEN = 'YXvXeKm4xqldUZIZxtwt8tslZxStu08SqXr2mOs_';
@@ -323,9 +323,9 @@ class SupabaseFinanceService {
                 email: email.trim(),
                 nome: (nome || 'Usuário').trim(),
                 transactions: [],
-                faturasParceladas: [],
-                despesasRecorrentes: [],
-                receitasRecorrentes: [],
+                faturas_parceladas: [],
+                despesas_recorrentes: [],
+                receitas_recorrentes: [],
                 updated_at: new Date().toISOString()
             };
             const upsert = this.client
@@ -364,16 +364,17 @@ class SupabaseFinanceService {
             }
 
             const parseJson = (value) => {
-                if (!value) return [];
+                if (value === null || value === undefined) return [];
                 if (typeof value === 'string') {
                     try { return JSON.parse(value); } catch (e) { console.warn('⚠️ Parse JSON falhou:', e); return []; }
                 }
                 return value;
             };
 
-            const faturas = parseJson(data.faturasParceladas);
-            const despesas = parseJson(data.despesasRecorrentes);
-            const receitas = parseJson(data.receitasRecorrentes);
+            // Colunas em snake_case no banco
+            const faturas = parseJson(data.faturas_parceladas);
+            const despesas = parseJson(data.despesas_recorrentes);
+            const receitas = parseJson(data.receitas_recorrentes);
             const transactions = parseJson(data.transactions);
 
             return {
@@ -414,9 +415,9 @@ class SupabaseFinanceService {
             if (data.email !== undefined) payload.email = data.email;
             if (data.nome !== undefined) payload.nome = data.nome;
             if (data.transactions !== undefined) payload.transactions = encode(data.transactions);
-            if (data.faturasParceladas !== undefined) payload.faturasParceladas = encode(data.faturasParceladas);
-            if (data.despesasRecorrentes !== undefined) payload.despesasRecorrentes = encode(data.despesasRecorrentes);
-            if (data.receitasRecorrentes !== undefined) payload.receitasRecorrentes = encode(data.receitasRecorrentes);
+            if (data.faturasParceladas !== undefined) payload.faturas_parceladas = encode(data.faturasParceladas);
+            if (data.despesasRecorrentes !== undefined) payload.despesas_recorrentes = encode(data.despesasRecorrentes);
+            if (data.receitasRecorrentes !== undefined) payload.receitas_recorrentes = encode(data.receitasRecorrentes);
 
             const upsert = this.client
                 .from(this.tableName)
