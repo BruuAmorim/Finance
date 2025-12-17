@@ -10,12 +10,15 @@ let currentYear = new Date().getFullYear();
 let currentUser = null;
 let isLoggedIn = false;
 let currentAuthForm = 'login'; // 'login' ou 'cadastro'
+let cloudSaveTimeout = null;
+const CLOUD_SAVE_DELAY = 1200; // ms - debounce para salvar na nuvem
 
 // ===============================
 //  CONFIGURAÇÃO
 // ===============================
 // NOTA: As configurações de Supabase Auth e NocoDB foram movidas para services.js
 // As constantes estão disponíveis globalmente após o carregamento de services.js
+const USE_NOCODB = false; // legado desativado (armazenamento agora no Supabase)
 
 // ===============================
 //  CARREGAR DO LOCALSTORAGE
@@ -129,10 +132,23 @@ function salvarLocal() {
     if (isLoggedIn && currentUser) {
         localStorage.setItem("transactions", JSON.stringify(transactions));
         atualizarBackupUsuarioLocal();
+        agendarSincronizacaoNuvem();
     } else {
         // Visitante sem login: não manter dados após recarregar
         localStorage.removeItem("transactions");
     }
+}
+
+// Dispara sincronização com a nuvem de forma debounced para evitar múltiplas requisições
+function agendarSincronizacaoNuvem() {
+    if (!isLoggedIn || !currentUser) return;
+    if (cloudSaveTimeout) {
+        clearTimeout(cloudSaveTimeout);
+    }
+    cloudSaveTimeout = setTimeout(() => {
+        salvarDadosUsuario();
+        cloudSaveTimeout = null;
+    }, CLOUD_SAVE_DELAY);
 }
 
 // ===============================
@@ -2742,14 +2758,14 @@ async function logout() {
 }
 
 // ===============================
-//  SINCRONIZAÇÃO DE DADOS - NOCODB
+//  SINCRONIZAÇÃO DE DADOS - SUPABASE
 // ===============================
-// NOTA: As funções antigas foram removidas.
+// NOTA: As funções antigas de NocoDB ficaram como legado.
 // Agora usamos os services centralizados (services.js):
 // - authService: Gerencia autenticação via Supabase Auth
-// - financeService: Gerencia dados financeiros no NocoDB
+// - financeService: Gerencia dados financeiros no Supabase
 // 
-// NUNCA salvar senhas no NocoDB - apenas dados financeiros!
+// NUNCA salvar senhas no banco de dados - apenas dados financeiros!
 
 // ===============================
 //  FUNÇÕES ANTIGAS REMOVIDAS
@@ -3235,7 +3251,7 @@ async function carregarDadosUsuario() {
                 faturasParceladas: financeResult.data.faturasParceladas || [],
                 despesasRecorrentes: financeResult.data.despesasRecorrentes || [],
                 receitasRecorrentes: financeResult.data.receitasRecorrentes || [],
-                updated_at: financeResult.data.created_at || new Date().toISOString()
+                updated_at: financeResult.data.updated_at || financeResult.data.created_at || new Date().toISOString()
             };
             
             // Comparar datas e usar o mais recente

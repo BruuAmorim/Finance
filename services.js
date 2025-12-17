@@ -11,6 +11,9 @@
 const SUPABASE_URL = 'https://ffpmfqqvxeuvjcgyjsen.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmcG1mcXF2eGV1dmpjZ3lqc2VuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0NzE5OTgsImV4cCI6MjA4MTA0Nzk5OH0.XfcdBtF7aUnrsbDA_A4DEuX6KOvgOOa9bVvV2unYmJg';
 
+// Supabase - tabela de finanças
+const SUPABASE_FINANCE_TABLE = 'finances';
+
 // NocoDB
 const NOCODB_API_TOKEN = 'YXvXeKm4xqldUZIZxtwt8tslZxStu08SqXr2mOs_';
 const NOCODB_BASE_URL = 'https://app.nocodb.com/api/v2/tables/mht7b7fomr6g2it/records';
@@ -279,324 +282,156 @@ class SupabaseAuthService {
 
 /**
  * ============================================
- * SERVICE: NOCODB FINANCE
+ * SERVICE: SUPABASE FINANCE
  * ============================================
- * Gerencia dados financeiros no NocoDB
+ * Armazena dados financeiros no banco do Supabase
  * NUNCA armazena senhas - apenas dados financeiros e perfil
  */
 
-class NocoDBFinanceService {
-    constructor(baseUrl, apiToken, viewId) {
-        this.baseUrl = baseUrl;
-        this.apiToken = apiToken;
-        this.viewId = viewId;
+class SupabaseFinanceService {
+    constructor(url, anonKey, tableName) {
+        this.url = url;
+        this.anonKey = anonKey;
+        this.tableName = tableName;
+        this.client = null;
+        this.initialized = false;
     }
 
-    /**
-     * Cria um perfil financeiro inicial para um usuário
-     * @param {object} profile - Dados do perfil
-     * @param {string} profile.userId - UUID do Supabase Auth
-     * @param {string} profile.email - Email do usuário
-     * @param {string} profile.nome - Nome do usuário
-     * @returns {Promise<{success: boolean, data: object|null, error: string|null}>}
-     */
-    async createFinanceProfile({ userId, email, nome }) {
+    async initialize() {
+        if (this.initialized && this.client) return true;
         try {
-            // Estrutura de dados financeiros inicial (vazia)
-            const financeData = {
+            if (typeof window !== 'undefined' && window.supabase && window.supabase.createClient) {
+                this.client = window.supabase.createClient(this.url, this.anonKey);
+                this.initialized = true;
+                return true;
+            }
+            console.warn('⚠️ Biblioteca Supabase não encontrada para Finance Service.');
+            return false;
+        } catch (error) {
+            console.error('❌ Erro ao inicializar Supabase Finance:', error);
+            return false;
+        }
+    }
+
+    async createFinanceProfile({ userId, email, nome }) {
+        if (!await this.initialize() || !this.client) {
+            return { success: false, data: null, error: 'Supabase não inicializado' };
+        }
+        try {
+            const payload = {
+                user_id: userId,
+                email: email.trim(),
+                nome: (nome || 'Usuário').trim(),
                 transactions: [],
                 faturasParceladas: [],
                 despesasRecorrentes: [],
                 receitasRecorrentes: [],
                 updated_at: new Date().toISOString()
             };
+            const upsert = this.client
+                .from(this.tableName)
+                .upsert([payload], { onConflict: 'user_id' })
+                .select();
 
-            const recordData = {
-                Email: email.trim(),
-                UserId: userId, // UUID do Supabase Auth
-                nome: nome.trim() || 'Usuário',
-                Transactions: JSON.stringify([]),
-                FaturasParceladas: JSON.stringify([]),
-                DespesasRecorrentes: JSON.stringify([]),
-                ReceitasRecorrentes: JSON.stringify([])
-                // created_at será auto-gerado pelo NocoDB
-                // NUNCA incluir Password aqui!
-            };
-
-            const params = new URLSearchParams({
-                offset: '0',
-                limit: '25',
-                where: '',
-                viewId: this.viewId
-            });
-
-            const url = `${this.baseUrl}?${params.toString()}`;
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'xc-token': this.apiToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(recordData)
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log('✅ Perfil financeiro criado no NocoDB');
-                return {
-                    success: true,
-                    data: data,
-                    error: null
-                };
-            } else {
-                const errorText = await response.text();
-                console.error('❌ Erro ao criar perfil financeiro:', errorText);
-                return {
-                    success: false,
-                    data: null,
-                    error: `HTTP ${response.status}: ${errorText}`
-                };
+            const { data, error } = upsert.maybeSingle ? await upsert.maybeSingle() : await upsert.single();
+            if (error) {
+                console.error('❌ Erro ao criar perfil financeiro no Supabase:', error);
+                return { success: false, data: null, error: error.message };
             }
+            return { success: true, data: data || payload, error: null };
         } catch (error) {
-            console.error('❌ Erro ao criar perfil financeiro:', error);
-            return {
-                success: false,
-                data: null,
-                error: error.message || 'Erro desconhecido'
-            };
+            console.error('❌ Erro ao createFinanceProfile:', error);
+            return { success: false, data: null, error: error.message || 'Erro desconhecido' };
         }
     }
 
-    /**
-     * Busca dados financeiros de um usuário pelo UserId (UUID do Supabase)
-     * @param {string} userId - UUID do Supabase Auth
-     * @returns {Promise<{success: boolean, data: object|null, error: string|null}>}
-     */
     async getFinanceByUserId(userId) {
+        if (!await this.initialize() || !this.client) {
+            return { success: false, data: null, error: 'Supabase não inicializado' };
+        }
         try {
-            const userIdSearch = encodeURIComponent(userId);
-            const params = new URLSearchParams({
-                offset: '0',
-                limit: '25',
-                where: `(UserId,eq,${userIdSearch})`,
-                viewId: this.viewId
-            });
+            const select = this.client
+                .from(this.tableName)
+                .select('*')
+                .eq('user_id', userId);
 
-            const url = `${this.baseUrl}?${params.toString()}`;
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'xc-token': this.apiToken,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.ok) {
-                const result = await response.json();
-                const records = result.list || result.records || [];
-
-                if (records.length > 0) {
-                    const record = records[0];
-                    
-                    // Parse dos dados JSON
-                    const faturas = record.FaturasParceladas 
-                        ? (typeof record.FaturasParceladas === 'string' 
-                            ? JSON.parse(record.FaturasParceladas) 
-                            : record.FaturasParceladas)
-                        : [];
-                    
-                    const despesas = record.DespesasRecorrentes
-                        ? (typeof record.DespesasRecorrentes === 'string'
-                            ? JSON.parse(record.DespesasRecorrentes)
-                            : record.DespesasRecorrentes)
-                        : [];
-                    
-                    const receitas = record.ReceitasRecorrentes
-                        ? (typeof record.ReceitasRecorrentes === 'string'
-                            ? JSON.parse(record.ReceitasRecorrentes)
-                            : record.ReceitasRecorrentes)
-                        : [];
-
-                    const transactions = record.Transactions
-                        ? (typeof record.Transactions === 'string'
-                            ? JSON.parse(record.Transactions)
-                            : record.Transactions)
-                        : [];
-
-                    return {
-                        success: true,
-                        data: {
-                            email: record.Email,
-                            userId: record.UserId,
-                            nome: record.nome || record.Nome,
-                            transactions: transactions,
-                            faturasParceladas: faturas,
-                            despesasRecorrentes: despesas,
-                            receitasRecorrentes: receitas,
-                            created_at: record.created_at
-                        },
-                        error: null
-                    };
-                } else {
-                    return {
-                        success: false,
-                        data: null,
-                        error: 'Nenhum registro encontrado'
-                    };
-                }
-            } else {
-                const errorText = await response.text();
-                console.error('❌ Erro ao buscar dados financeiros:', errorText);
-                return {
-                    success: false,
-                    data: null,
-                    error: `HTTP ${response.status}: ${errorText}`
-                };
+            const { data, error } = select.maybeSingle ? await select.maybeSingle() : await select.single();
+            if (error) {
+                return { success: false, data: null, error: error.message };
             }
-        } catch (error) {
-            console.error('❌ Erro ao buscar dados financeiros:', error);
-            return {
-                success: false,
-                data: null,
-                error: error.message || 'Erro desconhecido'
+            if (!data) {
+                return { success: false, data: null, error: 'Nenhum registro encontrado' };
+            }
+
+            const parseJson = (value) => {
+                if (!value) return [];
+                if (typeof value === 'string') {
+                    try { return JSON.parse(value); } catch (e) { console.warn('⚠️ Parse JSON falhou:', e); return []; }
+                }
+                return value;
             };
+
+            const faturas = parseJson(data.faturasParceladas);
+            const despesas = parseJson(data.despesasRecorrentes);
+            const receitas = parseJson(data.receitasRecorrentes);
+            const transactions = parseJson(data.transactions);
+
+            return {
+                success: true,
+                data: {
+                    email: data.email,
+                    userId: data.user_id,
+                    nome: data.nome,
+                    transactions,
+                    faturasParceladas: faturas,
+                    despesasRecorrentes: despesas,
+                    receitasRecorrentes: receitas,
+                    updated_at: data.updated_at || data.created_at
+                },
+                error: null
+            };
+        } catch (error) {
+            console.error('❌ Erro ao getFinanceByUserId:', error);
+            return { success: false, data: null, error: error.message || 'Erro desconhecido' };
         }
     }
 
-    /**
-     * Atualiza dados financeiros de um usuário (PATCH - atualização parcial)
-     * @param {string} userId - UUID do Supabase Auth
-     * @param {object} data - Dados para atualizar
-     * @param {array} [data.faturasParceladas] - Array de faturas parceladas
-     * @param {array} [data.despesasRecorrentes] - Array de despesas recorrentes
-     * @param {array} [data.receitasRecorrentes] - Array de receitas recorrentes
-     * @returns {Promise<{success: boolean, data: object|null, error: string|null}>}
-     */
     async updateFinanceByUserId(userId, data) {
+        if (!await this.initialize() || !this.client) {
+            return { success: false, data: null, error: 'Supabase não inicializado' };
+        }
         try {
-            // Primeiro, buscar o registro existente para obter o ID
-            const getResult = await this.getFinanceByUserId(userId);
-            
-            if (!getResult.success || !getResult.data) {
-                return {
-                    success: false,
-                    data: null,
-                    error: 'Registro não encontrado. Use createFinanceProfile primeiro.'
-                };
-            }
-
-            // Buscar o ID do registro no NocoDB
-            const userIdSearch = encodeURIComponent(userId);
-            const params = new URLSearchParams({
-                offset: '0',
-                limit: '25',
-                where: `(UserId,eq,${userIdSearch})`,
-                viewId: this.viewId
-            });
-
-            const getUrl = `${this.baseUrl}?${params.toString()}`;
-            const getResponse = await fetch(getUrl, {
-                method: 'GET',
-                headers: {
-                    'xc-token': this.apiToken,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!getResponse.ok) {
-                return {
-                    success: false,
-                    data: null,
-                    error: `Erro ao buscar registro: HTTP ${getResponse.status}`
-                };
-            }
-
-            const getData = await getResponse.json();
-            const records = getData.list || getData.records || [];
-
-            if (records.length === 0) {
-                return {
-                    success: false,
-                    data: null,
-                    error: 'Registro não encontrado'
-                };
-            }
-
-            const recordId = records[0].Id || records[0].id || records[0]._id;
-            if (!recordId) {
-                return {
-                    success: false,
-                    data: null,
-                    error: 'ID do registro não encontrado'
-                };
-            }
-
-            // Preparar dados para atualização (PATCH - apenas campos fornecidos)
-            const updateData = {};
-            
-            if (data.transactions !== undefined) {
-                updateData.Transactions = typeof data.transactions === 'string'
-                    ? data.transactions
-                    : JSON.stringify(data.transactions);
-            }
-            
-            if (data.faturasParceladas !== undefined) {
-                updateData.FaturasParceladas = typeof data.faturasParceladas === 'string' 
-                    ? data.faturasParceladas 
-                    : JSON.stringify(data.faturasParceladas);
-            }
-            
-            if (data.despesasRecorrentes !== undefined) {
-                updateData.DespesasRecorrentes = typeof data.despesasRecorrentes === 'string'
-                    ? data.despesasRecorrentes
-                    : JSON.stringify(data.despesasRecorrentes);
-            }
-            
-            if (data.receitasRecorrentes !== undefined) {
-                updateData.ReceitasRecorrentes = typeof data.receitasRecorrentes === 'string'
-                    ? data.receitasRecorrentes
-                    : JSON.stringify(data.receitasRecorrentes);
-            }
-
-            if (data.nome !== undefined) {
-                updateData.nome = data.nome;
-            }
-
-            // PATCH para atualização parcial
-            const updateUrl = `${this.baseUrl}/${recordId}`;
-            const updateResponse = await fetch(updateUrl, {
-                method: 'PATCH',
-                headers: {
-                    'xc-token': this.apiToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(updateData)
-            });
-
-            if (updateResponse.ok) {
-                const updatedData = await updateResponse.json();
-                console.log('✅ Dados financeiros atualizados no NocoDB');
-                return {
-                    success: true,
-                    data: updatedData,
-                    error: null
-                };
-            } else {
-                const errorText = await updateResponse.text();
-                console.error('❌ Erro ao atualizar dados financeiros:', errorText);
-                return {
-                    success: false,
-                    data: null,
-                    error: `HTTP ${updateResponse.status}: ${errorText}`
-                };
-            }
-        } catch (error) {
-            console.error('❌ Erro ao atualizar dados financeiros:', error);
-            return {
-                success: false,
-                data: null,
-                error: error.message || 'Erro desconhecido'
+            const encode = (value) => {
+                if (value === undefined) return undefined;
+                return typeof value === 'string' ? value : JSON.stringify(value ?? []);
             };
+
+            const payload = {
+                user_id: userId,
+                updated_at: new Date().toISOString()
+            };
+
+            if (data.email !== undefined) payload.email = data.email;
+            if (data.nome !== undefined) payload.nome = data.nome;
+            if (data.transactions !== undefined) payload.transactions = encode(data.transactions);
+            if (data.faturasParceladas !== undefined) payload.faturasParceladas = encode(data.faturasParceladas);
+            if (data.despesasRecorrentes !== undefined) payload.despesasRecorrentes = encode(data.despesasRecorrentes);
+            if (data.receitasRecorrentes !== undefined) payload.receitasRecorrentes = encode(data.receitasRecorrentes);
+
+            const upsert = this.client
+                .from(this.tableName)
+                .upsert([payload], { onConflict: 'user_id' })
+                .select();
+
+            const { data: result, error } = upsert.maybeSingle ? await upsert.maybeSingle() : await upsert.single();
+            if (error) {
+                console.error('❌ Erro ao atualizar dados financeiros (Supabase):', error);
+                return { success: false, data: null, error: error.message };
+            }
+            return { success: true, data: result || payload, error: null };
+        } catch (error) {
+            console.error('❌ Erro ao updateFinanceByUserId:', error);
+            return { success: false, data: null, error: error.message || 'Erro desconhecido' };
         }
     }
 }
@@ -608,10 +443,10 @@ class NocoDBFinanceService {
 // Service de Autenticação Supabase
 const authService = new SupabaseAuthService(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Service de Dados Financeiros NocoDB
-const financeService = new NocoDBFinanceService(
-    NOCODB_BASE_URL,
-    NOCODB_API_TOKEN,
-    NOCODB_VIEW_ID
+// Service de Dados Financeiros no Supabase
+const financeService = new SupabaseFinanceService(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
+    SUPABASE_FINANCE_TABLE
 );
 
