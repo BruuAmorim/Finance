@@ -279,80 +279,6 @@ class SupabaseAuthService {
 
 /**
  * ============================================
- * SERVICE: SUPABASE FINANCE (jsonb)
- * ============================================
- * Salva e lê dados financeiros diretamente no Supabase (tabela finance_data)
- */
-
-class SupabaseFinanceService {
-    constructor(url, anonKey) {
-        this.url = url;
-        this.anonKey = anonKey;
-        this.client = null;
-        this.initialized = false;
-    }
-
-    async initialize() {
-        if (this.initialized && this.client) return true;
-        if (typeof window === 'undefined' || !window.supabase || !window.supabase.createClient) {
-            console.warn('⚠️ Biblioteca Supabase não carregada no navegador');
-            return false;
-        }
-        try {
-            this.client = window.supabase.createClient(this.url, this.anonKey);
-            this.initialized = true;
-            return true;
-        } catch (err) {
-            console.error('❌ Erro ao inicializar Supabase client (finance):', err);
-            return false;
-        }
-    }
-
-    async upsertFinance(userId, payload) {
-        await this.initialize();
-        if (!this.client) return { success: false, error: 'Supabase não inicializado' };
-        const { data, error } = await this.client
-            .from('finance_data')
-            .upsert({
-                user_id: userId,
-                transactions: payload.transactions ?? [],
-                faturas_parceladas: payload.faturasParceladas ?? [],
-                despesas_recorrentes: payload.despesasRecorrentes ?? [],
-                receitas_recorrentes: payload.receitasRecorrentes ?? [],
-                updated_at: new Date().toISOString()
-            });
-        if (error) return { success: false, error: error.message };
-        return { success: true, data, error: null };
-    }
-
-    async getFinance(userId) {
-        await this.initialize();
-        if (!this.client) return { success: false, data: null, error: 'Supabase não inicializado' };
-        const { data, error } = await this.client
-            .from('finance_data')
-            .select('*')
-            .eq('user_id', userId)
-            .maybeSingle();
-        if (error && error.code !== 'PGRST116') { // not found
-            return { success: false, data: null, error: error.message };
-        }
-        if (!data) return { success: false, data: null, error: 'Nenhum registro encontrado' };
-        return {
-            success: true,
-            data: {
-                transactions: data.transactions || [],
-                faturasParceladas: data.faturas_parceladas || [],
-                despesasRecorrentes: data.despesas_recorrentes || [],
-                receitasRecorrentes: data.receitas_recorrentes || [],
-                updated_at: data.updated_at
-            },
-            error: null
-        };
-    }
-}
-
-/**
- * ============================================
  * SERVICE: NOCODB FINANCE
  * ============================================
  * Gerencia dados financeiros no NocoDB
@@ -668,6 +594,10 @@ class NocoDBFinanceService {
 // Service de Autenticação Supabase
 const authService = new SupabaseAuthService(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Service de Dados Financeiros no Supabase (jsonb)
-const financeService = new SupabaseFinanceService(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Service de Dados Financeiros NocoDB
+const financeService = new NocoDBFinanceService(
+    NOCODB_BASE_URL,
+    NOCODB_API_TOKEN,
+    NOCODB_VIEW_ID
+);
 

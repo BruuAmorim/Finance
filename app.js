@@ -3107,16 +3107,15 @@ async function salvarDadosUsuario() {
     }
     
     try {
-        // Usar o financeService (Supabase) para upsert
-        const result = await financeService.upsertFinance(currentUser.id, {
-            transactions,
-            faturasParceladas,
-            despesasRecorrentes,
-            receitasRecorrentes
+        // Usar o financeService para atualizar dados financeiros (PATCH)
+        const result = await financeService.updateFinanceByUserId(currentUser.id, {
+            faturasParceladas: faturasParceladas,
+            despesasRecorrentes: despesasRecorrentes,
+            receitasRecorrentes: receitasRecorrentes
         });
         
         if (result.success) {
-            console.log('✅ Dados financeiros salvos no Supabase');
+            console.log('✅ Dados financeiros salvos no NocoDB');
             
             // Sempre manter uma cópia no localStorage como backup
             const dadosUsuario = {
@@ -3211,34 +3210,34 @@ async function carregarDadosUsuario() {
             }
         }
 
-        // 2. Buscar dados financeiros no Supabase usando UserId (UUID do Supabase)
-        const financeResult = await financeService.getFinance(currentUser.id);
+        // 2. Buscar dados financeiros no NocoDB usando UserId (UUID do Supabase)
+        const financeResult = await financeService.getFinanceByUserId(currentUser.id);
         
         if (financeResult.success && financeResult.data) {
-            const dadosSupabase = {
+            const dadosNocoDB = {
                 faturasParceladas: financeResult.data.faturasParceladas || [],
                 despesasRecorrentes: financeResult.data.despesasRecorrentes || [],
                 receitasRecorrentes: financeResult.data.receitasRecorrentes || [],
-                transactions: financeResult.data.transactions || [],
-                updated_at: financeResult.data.updated_at || new Date().toISOString()
+                transactions: [], // Não está sendo salvo no NocoDB atualmente
+                updated_at: financeResult.data.created_at || new Date().toISOString()
             };
             
             // Comparar datas e usar o mais recente
             const dataLocal = dadosSelecionados && dadosSelecionados.updated_at 
                 ? new Date(dadosSelecionados.updated_at).getTime() 
                 : 0;
-            const dataRemote = dadosSupabase.updated_at 
-                ? new Date(dadosSupabase.updated_at).getTime() 
+            const dataNoco = dadosNocoDB.updated_at 
+                ? new Date(dadosNocoDB.updated_at).getTime() 
                 : 0;
             
-            if (!dadosSelecionados || dataRemote > dataLocal) {
-                dadosSelecionados = dadosSupabase;
-                console.log('✅ Dados carregados do Supabase (mais recentes que o local)');
+            if (!dadosSelecionados || dataNoco > dataLocal) {
+                dadosSelecionados = dadosNocoDB;
+                console.log('✅ Dados carregados do NocoDB (mais recentes que o local)');
             } else {
-                console.log('ℹ️ Mantendo dados locais mais recentes que os do Supabase');
+                console.log('ℹ️ Mantendo dados locais mais recentes que os do NocoDB');
             }
         } else if (financeResult.error) {
-            console.warn('⚠️ Erro ao carregar dados do Supabase:', financeResult.error);
+            console.warn('⚠️ Erro ao carregar dados do NocoDB:', financeResult.error);
             // Continuar com dados locais se houver
         }
 
